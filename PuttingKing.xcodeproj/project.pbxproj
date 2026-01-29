@@ -1,0 +1,608 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		APP001 /* PuttingKingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC001 /* PuttingKingApp.swift */; };
+		APP002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC002 /* AppState.swift */; };
+		APP003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC003 /* ContentView.swift */; };
+		AR001 /* ARSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC016 /* ARSessionManager.swift */; };
+		AR002 /* ARViewContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC017 /* ARViewContainer.swift */; };
+		CORE001 /* SIMD+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC004 /* SIMD+Extensions.swift */; };
+		CORE002 /* ARMeshGeometry+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC005 /* ARMeshGeometry+Extensions.swift */; };
+		CORE003 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC024 /* DependencyContainer.swift */; };
+		CORE004 /* PersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC025 /* PersistenceController.swift */; };
+		CORE005 /* ScanRecord+CoreDataClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC026 /* ScanRecord+CoreDataClass.swift */; };
+		CORE006 /* ScanRecord+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC027 /* ScanRecord+CoreDataProperties.swift */; };
+		DOM001 /* GreenSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC006 /* GreenSurface.swift */; };
+		DOM002 /* SlopeData.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC007 /* SlopeData.swift */; };
+		DOM003 /* PuttingLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC008 /* PuttingLine.swift */; };
+		DOM004 /* ScanSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC009 /* ScanSession.swift */; };
+		DOM005 /* PhysicsParameters.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC010 /* PhysicsParameters.swift */; };
+		FT001 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC018 /* HomeView.swift */; };
+		FT002 /* ScanningContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC019 /* ScanningContainerView.swift */; };
+		FT003 /* ScanningViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC020 /* ScanningViewModel.swift */; };
+		FT004 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC021 /* SettingsView.swift */; };
+		FT005 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC022 /* OnboardingView.swift */; };
+		FT006 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC023 /* HistoryView.swift */; };
+		RES001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = RES_ASSETS /* Assets.xcassets */; };
+		SVC001 /* LiDARScanningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC011 /* LiDARScanningService.swift */; };
+		SVC002 /* MeshReconstructionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC012 /* MeshReconstructionService.swift */; };
+		SVC003 /* SlopeAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC013 /* SlopeAnalysisService.swift */; };
+		SVC004 /* PathSimulationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC014 /* PathSimulationService.swift */; };
+		SVC005 /* BreakCalculationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC015 /* BreakCalculationService.swift */; };
+		SVC006 /* ScanHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC028 /* ScanHistoryService.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		INFO_PLIST /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		PRODUCT /* PuttingKing.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PuttingKing.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		RES_ASSETS /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		SRC001 /* PuttingKingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuttingKingApp.swift; sourceTree = "<group>"; };
+		SRC002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		SRC003 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		SRC004 /* SIMD+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SIMD+Extensions.swift"; sourceTree = "<group>"; };
+		SRC005 /* ARMeshGeometry+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ARMeshGeometry+Extensions.swift"; sourceTree = "<group>"; };
+		SRC006 /* GreenSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GreenSurface.swift; sourceTree = "<group>"; };
+		SRC007 /* SlopeData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlopeData.swift; sourceTree = "<group>"; };
+		SRC008 /* PuttingLine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PuttingLine.swift; sourceTree = "<group>"; };
+		SRC009 /* ScanSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSession.swift; sourceTree = "<group>"; };
+		SRC010 /* PhysicsParameters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicsParameters.swift; sourceTree = "<group>"; };
+		SRC011 /* LiDARScanningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiDARScanningService.swift; sourceTree = "<group>"; };
+		SRC012 /* MeshReconstructionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshReconstructionService.swift; sourceTree = "<group>"; };
+		SRC013 /* SlopeAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlopeAnalysisService.swift; sourceTree = "<group>"; };
+		SRC014 /* PathSimulationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathSimulationService.swift; sourceTree = "<group>"; };
+		SRC015 /* BreakCalculationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakCalculationService.swift; sourceTree = "<group>"; };
+		SRC016 /* ARSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSessionManager.swift; sourceTree = "<group>"; };
+		SRC017 /* ARViewContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewContainer.swift; sourceTree = "<group>"; };
+		SRC018 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		SRC019 /* ScanningContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanningContainerView.swift; sourceTree = "<group>"; };
+		SRC020 /* ScanningViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanningViewModel.swift; sourceTree = "<group>"; };
+		SRC021 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		SRC022 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		SRC023 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		SRC024 /* DependencyContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DependencyContainer.swift; sourceTree = "<group>"; };
+		SRC025 /* PersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceController.swift; sourceTree = "<group>"; };
+		SRC026 /* ScanRecord+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScanRecord+CoreDataClass.swift"; sourceTree = "<group>"; };
+		SRC027 /* ScanRecord+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScanRecord+CoreDataProperties.swift"; sourceTree = "<group>"; };
+		SRC028 /* ScanHistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanHistoryService.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FRAMEWORKS /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		APP_GROUP /* App */ = {
+			isa = PBXGroup;
+			children = (
+				SRC001 /* PuttingKingApp.swift */,
+				SRC002 /* AppState.swift */,
+				SRC003 /* ContentView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		ARKIT_GROUP /* ARKit */ = {
+			isa = PBXGroup;
+			children = (
+				SRC016 /* ARSessionManager.swift */,
+				SRC017 /* ARViewContainer.swift */,
+			);
+			path = ARKit;
+			sourceTree = "<group>";
+		};
+		CORE_GROUP /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				EXTENSIONS_GROUP /* Extensions */,
+				DI_GROUP /* DependencyInjection */,
+				PERSISTENCE_GROUP /* Persistence */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		DI_GROUP /* DependencyInjection */ = {
+			isa = PBXGroup;
+			children = (
+				SRC024 /* DependencyContainer.swift */,
+			);
+			path = DependencyInjection;
+			sourceTree = "<group>";
+		};
+		DOMAIN_GROUP /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				MODELS_GROUP /* Models */,
+				SERVICES_GROUP /* Services */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		EXTENSIONS_GROUP /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				SRC004 /* SIMD+Extensions.swift */,
+				SRC005 /* ARMeshGeometry+Extensions.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		FEATURES_GROUP /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				HOME_GROUP /* Home */,
+				SCANNING_GROUP /* Scanning */,
+				SETTINGS_GROUP /* Settings */,
+				ONBOARDING_GROUP /* Onboarding */,
+				HISTORY_GROUP /* History */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		HISTORY_GROUP /* History */ = {
+			isa = PBXGroup;
+			children = (
+				SRC023 /* HistoryView.swift */,
+			);
+			path = History;
+			sourceTree = "<group>";
+		};
+		HOME_GROUP /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				SRC018 /* HomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		MODELS_GROUP /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				SRC006 /* GreenSurface.swift */,
+				SRC007 /* SlopeData.swift */,
+				SRC008 /* PuttingLine.swift */,
+				SRC009 /* ScanSession.swift */,
+				SRC010 /* PhysicsParameters.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		ONBOARDING_GROUP /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				SRC022 /* OnboardingView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		PERSISTENCE_GROUP /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				SRC025 /* PersistenceController.swift */,
+				SRC026 /* ScanRecord+CoreDataClass.swift */,
+				SRC027 /* ScanRecord+CoreDataProperties.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		PRESENTATION_GROUP /* Presentation */ = {
+			isa = PBXGroup;
+			children = (
+				ARKIT_GROUP /* ARKit */,
+			);
+			path = Presentation;
+			sourceTree = "<group>";
+		};
+		PRODUCTS /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				PRODUCT /* PuttingKing.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		PUTTINGKING /* PuttingKing */ = {
+			isa = PBXGroup;
+			children = (
+				APP_GROUP /* App */,
+				CORE_GROUP /* Core */,
+				DOMAIN_GROUP /* Domain */,
+				FEATURES_GROUP /* Features */,
+				PRESENTATION_GROUP /* Presentation */,
+				RESOURCES_GROUP /* Resources */,
+				INFO_PLIST /* Info.plist */,
+			);
+			path = PuttingKing;
+			sourceTree = "<group>";
+		};
+		RESOURCES_GROUP /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				RES_ASSETS /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		ROOT = {
+			isa = PBXGroup;
+			children = (
+				PUTTINGKING /* PuttingKing */,
+				PRODUCTS /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		SCANNING_GROUP /* Scanning */ = {
+			isa = PBXGroup;
+			children = (
+				SCANNING_VIEWS /* Views */,
+				SCANNING_VIEWMODELS /* ViewModels */,
+			);
+			path = Scanning;
+			sourceTree = "<group>";
+		};
+		SCANNING_VIEWMODELS /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				SRC020 /* ScanningViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		SCANNING_VIEWS /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				SRC019 /* ScanningContainerView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		SERVICES_GROUP /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				SRC011 /* LiDARScanningService.swift */,
+				SRC012 /* MeshReconstructionService.swift */,
+				SRC013 /* SlopeAnalysisService.swift */,
+				SRC014 /* PathSimulationService.swift */,
+				SRC015 /* BreakCalculationService.swift */,
+				SRC028 /* ScanHistoryService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		SETTINGS_GROUP /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				SRC021 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		TARGET /* PuttingKing */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CONFIG_LIST /* Build configuration list for PBXNativeTarget "PuttingKing" */;
+			buildPhases = (
+				SOURCES /* Sources */,
+				FRAMEWORKS /* Frameworks */,
+				RESOURCES /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PuttingKing;
+			productName = PuttingKing;
+			productReference = PRODUCT /* PuttingKing.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		PROJECT /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					TARGET = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = PROJECT_CONFIG_LIST /* Build configuration list for PBXProject "PuttingKing" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = ROOT;
+			productRefGroup = PRODUCTS /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				TARGET /* PuttingKing */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		RESOURCES /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				RES001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		SOURCES /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				APP001 /* PuttingKingApp.swift in Sources */,
+				APP002 /* AppState.swift in Sources */,
+				APP003 /* ContentView.swift in Sources */,
+				CORE001 /* SIMD+Extensions.swift in Sources */,
+				CORE002 /* ARMeshGeometry+Extensions.swift in Sources */,
+				CORE003 /* DependencyContainer.swift in Sources */,
+				CORE004 /* PersistenceController.swift in Sources */,
+				CORE005 /* ScanRecord+CoreDataClass.swift in Sources */,
+				CORE006 /* ScanRecord+CoreDataProperties.swift in Sources */,
+				DOM001 /* GreenSurface.swift in Sources */,
+				DOM002 /* SlopeData.swift in Sources */,
+				DOM003 /* PuttingLine.swift in Sources */,
+				DOM004 /* ScanSession.swift in Sources */,
+				DOM005 /* PhysicsParameters.swift in Sources */,
+				SVC001 /* LiDARScanningService.swift in Sources */,
+				SVC002 /* MeshReconstructionService.swift in Sources */,
+				SVC003 /* SlopeAnalysisService.swift in Sources */,
+				SVC004 /* PathSimulationService.swift in Sources */,
+				SVC005 /* BreakCalculationService.swift in Sources */,
+				SVC006 /* ScanHistoryService.swift in Sources */,
+				AR001 /* ARSessionManager.swift in Sources */,
+				AR002 /* ARViewContainer.swift in Sources */,
+				FT001 /* HomeView.swift in Sources */,
+				FT002 /* ScanningContainerView.swift in Sources */,
+				FT003 /* ScanningViewModel.swift in Sources */,
+				FT004 /* SettingsView.swift in Sources */,
+				FT005 /* OnboardingView.swift in Sources */,
+				FT006 /* HistoryView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		DEBUG_PROJECT /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		DEBUG_TARGET /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C5UQ4PX96Z;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PuttingKing/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PuttingKing;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";
+				INFOPLIST_KEY_NSCameraUsageDescription = "PuttingKing uses the camera and LiDAR sensor to scan the golf green and calculate your optimal putting line.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "PuttingKing uses motion sensors to track device orientation during green scanning.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = "arkit lidar";
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.puttingking.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		RELEASE_PROJECT /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		RELEASE_TARGET /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C5UQ4PX96Z;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PuttingKing/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PuttingKing;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";
+				INFOPLIST_KEY_NSCameraUsageDescription = "PuttingKing uses the camera and LiDAR sensor to scan the golf green and calculate your optimal putting line.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "PuttingKing uses motion sensors to track device orientation during green scanning.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = "arkit lidar";
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleLightContent;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.puttingking.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		CONFIG_LIST /* Build configuration list for PBXNativeTarget "PuttingKing" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DEBUG_TARGET /* Debug */,
+				RELEASE_TARGET /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		PROJECT_CONFIG_LIST /* Build configuration list for PBXProject "PuttingKing" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DEBUG_PROJECT /* Debug */,
+				RELEASE_PROJECT /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = PROJECT /* Project object */;
+}

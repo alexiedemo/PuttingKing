@@ -1,0 +1,322 @@
+import Foundation
+import ARKit
+import simd
+
+/// Protocol for mesh reconstruction
+protocol MeshReconstructionServiceProtocol {
+    func reconstructSurface(from anchors: [ARMeshAnchor]) async throws -> GreenSurface
+    func filterGreenMesh(from surface: GreenSurface, around center: SIMD3<Float>, radius: Float) -> GreenSurface
+}
+
+/// Service that reconstructs a unified green surface from LiDAR mesh data
+final class MeshReconstructionService: MeshReconstructionServiceProtocol {
+
+    /// Reconstruct a unified surface from mesh anchors
+    func reconstructSurface(from anchors: [ARMeshAnchor]) async throws -> GreenSurface {
+        guard !anchors.isEmpty else {
+            throw ScanError.insufficientData
+        }
+
+        // Step 1: Extract and transform all vertices to world space with deduplication
+        var allVertices: [SIMD3<Float>] = []
+        var allNormals: [SIMD3<Float>] = []
+        var allTriangles: [UInt32] = []
+        
+        // Map unique vertices to their index to prevent duplicates
+        // Using a tolerance key string for "fuzzy" equality or just raw value if exact
+        var vertexMap: [SIMD3<Float>: UInt32] = [:] 
+
+        for anchor in anchors {
+            let worldVertices = anchor.worldVertices()
+            let worldNormals = anchor.worldNormals()
+            let triangles = anchor.geometry.extractTriangleIndices()
+            let classifications = anchor.geometry.extractClassifications()
+
+            // Filter for horizontal surfaces (ground/green)
+            for i in stride(from: 0, to: triangles.count, by: 3) {
+                // Bounds check to prevent crashes
+                guard i + 2 < triangles.count else { continue }
+
+                let idx0 = Int(triangles[i])
+                let idx1 = Int(triangles[i + 1])
+                let idx2 = Int(triangles[i + 2])
+
+                // Validate indices are within bounds
+                guard idx0 < worldVertices.count && idx1 < worldVertices.count && idx2 < worldVertices.count,
+                      idx0 < worldNormals.count && idx1 < worldNormals.count && idx2 < worldNormals.count else {
+                    continue
+                }
+
+                // Check if this face is roughly horizontal
+                let normal0 = worldNormals[idx0]
+                let normal1 = worldNormals[idx1]
+                let normal2 = worldNormals[idx2]
+                let sumNormal = normal0 + normal1 + normal2
+                let sumLength = simd_length(sumNormal)
+                guard sumLength > 0.001 else { continue }
+                let avgNormal = sumNormal / sumLength
+
+                // Check if face is classified as floor/ground or is horizontal
+                let isHorizontal = avgNormal.y > 0.7 // cos(45 degrees)
+
+                var isGround = isHorizontal
+                if let classifications = classifications {
+                    let faceIndex = i / 3
+                    if faceIndex < classifications.count {
+                        let classification = classifications[faceIndex]
+                        isGround = isHorizontal && (classification == .floor || classification == .none)
+                    }
+                }
+
+                if isGround {
+                    // Add vertices with deduplication
+                    let v0 = worldVertices[idx0]
+                    let v1 = worldVertices[idx1]
+                    let v2 = worldVertices[idx2]
+                    
+                    let n0 = worldNormals[idx0]
+                    let n1 = worldNormals[idx1]
+                    let n2 = worldNormals[idx2]
+
+                    let newIdx0 = getOrAddVertex(v0, normal: n0, map: &vertexMap, vertices: &allVertices, normals: &allNormals)
+                    let newIdx1 = getOrAddVertex(v1, normal: n1, map: &vertexMap, vertices: &allVertices, normals: &allNormals)
+                    let newIdx2 = getOrAddVertex(v2, normal: n2, map: &vertexMap, vertices: &allVertices, normals: &allNormals)
+
+                    allTriangles.append(newIdx0)
+                    allTriangles.append(newIdx1)
+                    allTriangles.append(newIdx2)
+                }
+            }
+        }
+
+        guard allVertices.count >= 3 else {
+            throw ScanError.meshReconstructionFailed
+        }
+
+        // Step 2: Apply smoothing
+        let smoothedVertices = laplacianSmooth(
+            vertices: allVertices,
+            triangles: allTriangles,
+            iterations: 2,
+            lambda: 0.3
+        )
+
+        // Step 3: Recalculate normals after smoothing
+        let recalculatedNormals = calculateNormals(vertices: smoothedVertices, triangles: allTriangles)
+
+        // Step 4: Calculate bounding box
+        let boundingBox = calculateBoundingBox(smoothedVertices)
+
+        // Step 5: Calculate quality score
+        let qualityScore = calculateQualityScore(
+            vertexCount: smoothedVertices.count,
+            area: boundingBox.area
+        )
+
+        return GreenSurface(
+            id: UUID(),
+            vertices: smoothedVertices,
+            triangles: allTriangles,
+            normals: recalculatedNormals,
+            boundingBox: boundingBox,
+            captureDate: Date(),
+            qualityScore: qualityScore
+        )
+    }
+
+    /// Filter mesh to only include area around a center point
+    func filterGreenMesh(from surface: GreenSurface, around center: SIMD3<Float>, radius: Float) -> GreenSurface {
+        var filteredVertices: [SIMD3<Float>] = []
+        var filteredNormals: [SIMD3<Float>] = []
+        var filteredTriangles: [UInt32] = []
+        var indexMap: [Int: UInt32] = [:]
+
+        // Filter triangles within radius
+        for i in stride(from: 0, to: surface.triangles.count, by: 3) {
+            let idx0 = Int(surface.triangles[i])
+            let idx1 = Int(surface.triangles[i + 1])
+            let idx2 = Int(surface.triangles[i + 2])
+
+            let v0 = surface.vertices[idx0]
+            let v1 = surface.vertices[idx1]
+            let v2 = surface.vertices[idx2]
+
+            // Check if triangle center is within radius
+            let triangleCenter = (v0 + v1 + v2) / 3.0
+            let distance = triangleCenter.horizontalDistance(to: center)
+
+            if distance <= radius {
+                // Map old indices to new indices
+                for oldIdx in [idx0, idx1, idx2] {
+                    if indexMap[oldIdx] == nil {
+                        let newIdx = UInt32(filteredVertices.count)
+                        indexMap[oldIdx] = newIdx
+                        filteredVertices.append(surface.vertices[oldIdx])
+                        filteredNormals.append(surface.normals[oldIdx])
+                    }
+                    filteredTriangles.append(indexMap[oldIdx]!)
+                }
+            }
+        }
+
+        let boundingBox = calculateBoundingBox(filteredVertices)
+
+        return GreenSurface(
+            id: surface.id,
+            vertices: filteredVertices,
+            triangles: filteredTriangles,
+            normals: filteredNormals,
+            boundingBox: boundingBox,
+            captureDate: surface.captureDate,
+            qualityScore: surface.qualityScore
+        )
+    }
+
+    // MARK: - Helper Methods
+
+    /// Get index of existing vertex or add new one
+    private func getOrAddVertex(
+        _ position: SIMD3<Float>,
+        normal: SIMD3<Float>,
+        map: inout [SIMD3<Float>: UInt32],
+        vertices: inout [SIMD3<Float>],
+        normals: inout [SIMD3<Float>]
+    ) -> UInt32 {
+        if let existingIdx = map[position] {
+            return existingIdx
+        }
+
+        let newIdx = UInt32(vertices.count)
+        vertices.append(position)
+        normals.append(normal)
+        map[position] = newIdx
+        return newIdx
+    }
+
+    // MARK: - Private Methods
+
+    /// Apply Laplacian smoothing to reduce noise
+    private func laplacianSmooth(
+        vertices: [SIMD3<Float>],
+        triangles: [UInt32],
+        iterations: Int,
+        lambda: Float
+    ) -> [SIMD3<Float>] {
+        guard vertices.count > 0 else { return vertices }
+
+        // Build adjacency list
+        var neighbors: [[Int]] = Array(repeating: [], count: vertices.count)
+
+        for i in stride(from: 0, to: triangles.count, by: 3) {
+            let i0 = Int(triangles[i])
+            let i1 = Int(triangles[i + 1])
+            let i2 = Int(triangles[i + 2])
+
+            // Add bidirectional edges
+            if !neighbors[i0].contains(i1) { neighbors[i0].append(i1) }
+            if !neighbors[i0].contains(i2) { neighbors[i0].append(i2) }
+            if !neighbors[i1].contains(i0) { neighbors[i1].append(i0) }
+            if !neighbors[i1].contains(i2) { neighbors[i1].append(i2) }
+            if !neighbors[i2].contains(i0) { neighbors[i2].append(i0) }
+            if !neighbors[i2].contains(i1) { neighbors[i2].append(i1) }
+        }
+
+        var current = vertices
+
+        for _ in 0..<iterations {
+            var smoothed = current
+
+            for i in 0..<current.count {
+                guard !neighbors[i].isEmpty else { continue }
+
+                // Calculate centroid of neighbors
+                let neighborSum = neighbors[i].reduce(SIMD3<Float>.zero) { sum, idx in
+                    sum + current[idx]
+                }
+                let centroid = neighborSum / Float(neighbors[i].count)
+
+                // Move vertex toward centroid
+                smoothed[i] = current[i] + lambda * (centroid - current[i])
+            }
+
+            current = smoothed
+        }
+
+        return current
+    }
+
+    /// Calculate normals from vertices and triangles
+    private func calculateNormals(vertices: [SIMD3<Float>], triangles: [UInt32]) -> [SIMD3<Float>] {
+        var normals = [SIMD3<Float>](repeating: .zero, count: vertices.count)
+        var counts = [Int](repeating: 0, count: vertices.count)
+
+        // Accumulate face normals at each vertex
+        for i in stride(from: 0, to: triangles.count, by: 3) {
+            let i0 = Int(triangles[i])
+            let i1 = Int(triangles[i + 1])
+            let i2 = Int(triangles[i + 2])
+
+            let v0 = vertices[i0]
+            let v1 = vertices[i1]
+            let v2 = vertices[i2]
+
+            let edge1 = v1 - v0
+            let edge2 = v2 - v0
+            let faceNormal = simd_cross(edge1, edge2)
+
+            // Ensure normal points up
+            let normalizedFaceNormal = simd_length(faceNormal) > 0.0001
+                ? simd_normalize(faceNormal)
+                : SIMD3<Float>(0, 1, 0)
+
+            let upwardNormal = normalizedFaceNormal.y >= 0 ? normalizedFaceNormal : -normalizedFaceNormal
+
+            normals[i0] += upwardNormal
+            normals[i1] += upwardNormal
+            normals[i2] += upwardNormal
+            counts[i0] += 1
+            counts[i1] += 1
+            counts[i2] += 1
+        }
+
+        // Average and normalize
+        for i in 0..<normals.count {
+            if counts[i] > 0 {
+                normals[i] = simd_normalize(normals[i] / Float(counts[i]))
+            } else {
+                normals[i] = SIMD3<Float>(0, 1, 0) // Default up
+            }
+        }
+
+        return normals
+    }
+
+    /// Calculate bounding box
+    private func calculateBoundingBox(_ vertices: [SIMD3<Float>]) -> GreenSurface.BoundingBox {
+        guard !vertices.isEmpty else {
+            return GreenSurface.BoundingBox(min: .zero, max: .zero)
+        }
+
+        var minPoint = vertices[0]
+        var maxPoint = vertices[0]
+
+        for vertex in vertices {
+            minPoint = simd_min(minPoint, vertex)
+            maxPoint = simd_max(maxPoint, vertex)
+        }
+
+        return GreenSurface.BoundingBox(min: minPoint, max: maxPoint)
+    }
+
+    /// Calculate quality score
+    private func calculateQualityScore(vertexCount: Int, area: Float) -> Float {
+        // Target density: ~1000 vertices per square meter
+        let density = Float(vertexCount) / max(area, 0.1)
+        let densityScore = min(density / 1000.0, 1.0)
+
+        // Target area: at least 10 square meters
+        let areaScore = min(area / 10.0, 1.0)
+
+        return densityScore * 0.6 + areaScore * 0.4
+    }
+}
