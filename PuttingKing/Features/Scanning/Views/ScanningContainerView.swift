@@ -110,10 +110,13 @@ struct ScanningContainerView: View {
     private func handleStateChange(_ newState: ScanSession.ScanState) {
         guard appState.settings.hapticFeedbackEnabled else {
             // Still handle non-haptic state changes
-            if newState == .analyzing {
+            switch newState {
+            case .analyzing:
                 startAnalysisProgress()
-            } else if newState == .displayingResult || newState == .error(ScanError.insufficientData) {
+            case .displayingResult, .error:
                 stopAnalysisProgress()
+            default:
+                break
             }
             updateCrosshairState()
             return

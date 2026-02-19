@@ -140,10 +140,17 @@ final class ScanHistoryService: ObservableObject {
     func deleteAllScans() {
         let request: NSFetchRequest<NSFetchRequestResult> = ScanRecord.fetchRequest()
         let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
+        deleteRequest.resultType = .resultTypeObjectIDs
 
         do {
-            try persistenceController.viewContext.execute(deleteRequest)
-            persistenceController.save()
+            let result = try persistenceController.viewContext.execute(deleteRequest) as? NSBatchDeleteResult
+            // Merge batch delete into the context so in-memory objects are invalidated
+            if let objectIDs = result?.result as? [NSManagedObjectID] {
+                NSManagedObjectContext.mergeChanges(
+                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                    into: [persistenceController.viewContext]
+                )
+            }
             fetchRecentScans()
         } catch {
             print("Failed to delete all scans: \(error)")

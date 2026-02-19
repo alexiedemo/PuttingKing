@@ -404,6 +404,9 @@ final class ScanningViewModel: ObservableObject {
             // Step 1: Reconstruct surface from mesh data
             let surface = try await meshService.reconstructSurface(from: meshAnchors)
 
+            // Check cancellation after each expensive async step to respect timeout
+            guard !Task.isCancelled else { return }
+
             print("[ViewModel] Surface reconstructed: \(surface.vertexCount) vertices")
 
             // Step 2: Filter to relevant area (between ball and hole + buffer)
@@ -417,6 +420,8 @@ final class ScanningViewModel: ObservableObject {
 
             // Step 3: Analyze slopes
             let slopeData = slopeService.analyzeSurface(filteredSurface)
+
+            guard !Task.isCancelled else { return }
 
             print("[ViewModel] Slope analyzed: avg \(slopeData.averageSlope)%")
 
@@ -434,6 +439,9 @@ final class ScanningViewModel: ObservableObject {
                 with: slopeData,
                 parameters: parameters
             ) {
+                // Check cancellation before updating state — timeout may have fired
+                guard !Task.isCancelled else { return }
+
                 self.puttingLine = line
                 self.scanState = .displayingResult
                 self.currentSession?.state = .displayingResult
@@ -445,6 +453,8 @@ final class ScanningViewModel: ObservableObject {
                     self.saveScan()
                 }
             } else {
+                guard !Task.isCancelled else { return }
+
                 // Create a simple straight line if optimal path not found
                 self.puttingLine = createSimpleLine(from: ball, to: hole)
                 self.scanState = .displayingResult
@@ -458,11 +468,13 @@ final class ScanningViewModel: ObservableObject {
                 }
             }
         } catch let scanError as ScanError {
+            guard !Task.isCancelled else { return }
             self.error = scanError
             self.scanState = .error(scanError)
             self.isAnalyzing = false
             print("[ViewModel] Analysis error: \(scanError.message)")
         } catch {
+            guard !Task.isCancelled else { return }
             self.error = .unknown(error.localizedDescription)
             self.scanState = .error(.unknown(error.localizedDescription))
             self.isAnalyzing = false
@@ -473,7 +485,8 @@ final class ScanningViewModel: ObservableObject {
     /// Create a simple straight line when optimal path calculation fails
     private func createSimpleLine(from ball: BallPosition, to hole: HolePosition) -> PuttingLine {
         let distance = ball.worldPosition.horizontalDistance(to: hole.worldPosition)
-        let direction = simd_normalize(hole.worldPosition - ball.worldPosition)
+        let diff = hole.worldPosition - ball.worldPosition
+        let direction = simd_length(diff) > 0.001 ? simd_normalize(diff) : SIMD3<Float>(1, 0, 0)
 
         // Create path points
         var pathPoints: [PuttingLine.PathPoint] = []
