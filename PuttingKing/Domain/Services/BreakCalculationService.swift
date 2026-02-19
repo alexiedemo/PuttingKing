@@ -91,6 +91,12 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         let startTime = CFAbsoluteTimeGetCurrent()
         let distance = ball.worldPosition.horizontalDistance(to: hole.worldPosition)
 
+        // Guard against zero-distance putts (ball at same position as hole)
+        guard distance > 0.001 else {
+            print("[BreakCalc] Ball and hole at same position, skipping calculation")
+            return [:]
+        }
+
         print("[BreakCalc] Starting multi-strategy calculation, distance: \(String(format: "%.2f", distance))m")
 
         let directDirection = simd_normalize(hole.worldPosition - ball.worldPosition)

@@ -64,10 +64,16 @@ struct ARViewContainer: UIViewRepresentable {
         case .markingHole:
             arSessionManager.showCrosshair(mode: .hole)
             arSessionManager.setMeshVisualizationEnabled(false) // Only show mesh AFTER marking hole
+            // Reset hole flag so re-marking places a new marker (Redo Hole flow)
+            coordinator.hasPlacedHoleMarker = false
 
         case .scanningGreen:
             arSessionManager.hideCrosshair()
             arSessionManager.setMeshVisualizationEnabled(true)
+            // Reset ball and line flags for new putt cycle (New Putt flow)
+            coordinator.hasPlacedBallMarker = false
+            coordinator.hasDisplayedLine = false
+            arSessionManager.clearPuttingLine()
 
             // Only place hole marker once when transitioning to this state
             if !coordinator.hasPlacedHoleMarker,
