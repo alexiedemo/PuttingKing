@@ -429,7 +429,10 @@ final class ScanningViewModel: ObservableObject {
             let parameters = PhysicsParameters(
                 stimpmeterSpeed: settings.stimpmeterSpeed,
                 grassType: settings.grassType,
-                moistureLevel: settings.greenCondition.moistureLevel
+                moistureLevel: settings.greenCondition.moistureLevel,
+                grainDirection: settings.grainDirectionRadians,
+                temperatureCelsius: settings.temperatureCelsius,
+                altitudeMeters: settings.altitudeMeters
             )
 
             if let line = await breakService.findOptimalPutt(

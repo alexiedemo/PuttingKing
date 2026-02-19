@@ -201,19 +201,23 @@ final class PathSimulationService: PathSimulationServiceProtocol {
                 )
             }
 
-            // Friction force based on motion phase
+            // Friction force based on motion phase, adjusted for grain direction
             var frictionForce = SIMD3<Float>.zero
             if speed > 0.001 {
                 let velocityDir = simd_normalize(velocity)
                 let frictionMagnitude: Float
 
+                // Ball travel direction in XZ plane for grain calculation
+                let ballDir2D = SIMD2<Float>(velocity.x, velocity.z)
+                let grainAdjustedFriction = parameters.frictionWithGrain(ballDirection: ballDir2D)
+
                 switch motionPhase {
                 case .skidding:
-                    // Higher friction during skid phase
-                    frictionMagnitude = parameters.skidDeceleration() * cos(slopeAngle)
+                    // Higher friction during skid phase, grain-adjusted
+                    frictionMagnitude = grainAdjustedFriction * parameters.skidFrictionMultiplier * g * cos(slopeAngle)
                 case .rolling:
-                    // Pure rolling friction with (5/7) factor
-                    frictionMagnitude = parameters.rollingDeceleration(slopeAngle: slopeAngle)
+                    // Pure rolling friction with (5/7) factor, grain-adjusted
+                    frictionMagnitude = PhysicsParameters.rollingDecelerationFactor * grainAdjustedFriction * g * cos(slopeAngle)
                 case .stopped:
                     frictionMagnitude = 0
                 }
@@ -221,8 +225,15 @@ final class PathSimulationService: PathSimulationServiceProtocol {
                 frictionForce = -velocityDir * frictionMagnitude
             }
 
-            // Total acceleration
-            let acceleration = gravityForce + frictionForce
+            // Grain lateral deflection force (pushes ball toward grain direction)
+            var grainForce = SIMD3<Float>.zero
+            let grainAccel = parameters.grainDeflectionAcceleration(ballSpeed: speed)
+            if simd_length(grainAccel) > 0.0001 {
+                grainForce = SIMD3<Float>(grainAccel.x, 0, grainAccel.y)
+            }
+
+            // Total acceleration = gravity + friction + grain deflection
+            let acceleration = gravityForce + frictionForce + grainForce
 
             // RK4 Integration for high accuracy
             let (newPosition, newVelocity) = rk4Integrate(
@@ -395,7 +406,7 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         return SIMD3<Float>(position.x, finalY, position.z)
     }
 
-    /// Calculate acceleration at a given position considering slope
+    /// Calculate acceleration at a given position considering slope and grain
     private func calculateAcceleration(
         at position: SIMD3<Float>,
         velocity: SIMD3<Float>,
@@ -410,6 +421,7 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         let speed = simd_length(velocity)
         let gradient = slopeSample.gradient
         let slopeAngle = slopeSample.slopeAngle
+        let g = parameters.gravity
 
         // Gravity component along slope
         var gravityForce = SIMD3<Float>.zero
@@ -417,23 +429,25 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         if gradientLength > 0.001 {
             let gradientDir = gradient / gradientLength
             gravityForce = SIMD3<Float>(
-                parameters.gravity * sin(slopeAngle) * gradientDir.x,
+                g * sin(slopeAngle) * gradientDir.x,
                 0,
-                parameters.gravity * sin(slopeAngle) * gradientDir.y
+                g * sin(slopeAngle) * gradientDir.y
             )
         }
 
-        // Friction force
+        // Friction force with grain direction adjustment
         var frictionForce = SIMD3<Float>.zero
         if speed > 0.001 {
             let velocityDir = simd_normalize(velocity)
+            let ballDir2D = SIMD2<Float>(velocity.x, velocity.z)
+            let grainAdjustedFriction = parameters.frictionWithGrain(ballDirection: ballDir2D)
             let frictionMagnitude: Float
 
             switch motionPhase {
             case .skidding:
-                frictionMagnitude = parameters.skidDeceleration() * cos(slopeAngle)
+                frictionMagnitude = grainAdjustedFriction * parameters.skidFrictionMultiplier * g * cos(slopeAngle)
             case .rolling:
-                frictionMagnitude = parameters.rollingDeceleration(slopeAngle: slopeAngle)
+                frictionMagnitude = PhysicsParameters.rollingDecelerationFactor * grainAdjustedFriction * g * cos(slopeAngle)
             case .stopped:
                 frictionMagnitude = 0
             }
@@ -441,6 +455,13 @@ final class PathSimulationService: PathSimulationServiceProtocol {
             frictionForce = -velocityDir * frictionMagnitude
         }
 
-        return gravityForce + frictionForce
+        // Grain lateral deflection
+        var grainForce = SIMD3<Float>.zero
+        let grainAccel = parameters.grainDeflectionAcceleration(ballSpeed: speed)
+        if simd_length(grainAccel) > 0.0001 {
+            grainForce = SIMD3<Float>(grainAccel.x, 0, grainAccel.y)
+        }
+
+        return gravityForce + frictionForce + grainForce
     }
 }

@@ -91,6 +91,36 @@ struct AppSettings: Codable, Equatable {
     var grassType: GrassType = .bentGrass
     var greenCondition: GreenCondition = .normal
 
+    // Grain direction in degrees (0 = North, 90 = East, 180 = South, 270 = West)
+    // Grain typically grows toward the setting sun (west) or toward water drainage
+    private var _grainDirectionDegrees: Float = 270.0
+    var grainDirectionDegrees: Float {
+        get { _grainDirectionDegrees }
+        set {
+            var v = newValue.truncatingRemainder(dividingBy: 360.0)
+            if v < 0 { v += 360.0 }
+            _grainDirectionDegrees = v
+        }
+    }
+
+    /// Grain direction in radians for physics calculations
+    var grainDirectionRadians: Float {
+        _grainDirectionDegrees * .pi / 180.0
+    }
+
+    // Environmental conditions
+    private var _temperatureCelsius: Float = 20.0
+    var temperatureCelsius: Float {
+        get { _temperatureCelsius }
+        set { _temperatureCelsius = max(-10.0, min(50.0, newValue)) }
+    }
+
+    private var _altitudeMeters: Float = 0.0
+    var altitudeMeters: Float {
+        get { _altitudeMeters }
+        set { _altitudeMeters = max(0.0, min(5000.0, newValue)) }
+    }
+
     // Accessibility settings
     var highContrastMode: Bool = false
     var showConfidenceBand: Bool = true
@@ -103,6 +133,9 @@ struct AppSettings: Codable, Equatable {
         case lineColor, autoSaveScans, defaultCourseName
         case _defaultHoleNumber = "defaultHoleNumber"
         case grassType, greenCondition
+        case _grainDirectionDegrees = "grainDirectionDegrees"
+        case _temperatureCelsius = "temperatureCelsius"
+        case _altitudeMeters = "altitudeMeters"
         case highContrastMode, showConfidenceBand, colorblindMode
     }
 

@@ -1,14 +1,47 @@
 import Foundation
+import simd
 
 /// Grass type affects friction and grain behavior
 enum GrassType: String, CaseIterable, Codable {
     case bentGrass = "Bent Grass"
     case bermudaGrass = "Bermuda"
+    case poaAnnua = "Poa Annua"
+    case fescue = "Fescue"
+    case ryeGrass = "Ryegrass"
 
+    /// How strongly grain affects friction (speed change with/against grain)
+    /// 0.0 = no grain effect, 0.20 = 20% friction change
     var grainFactor: Float {
         switch self {
-        case .bentGrass: return 0.0 // Minimal grain effect
-        case .bermudaGrass: return 0.20 // Significant grain effect
+        case .bentGrass: return 0.05  // Minimal grain, grows upright
+        case .bermudaGrass: return 0.20 // Strong grain, grows laterally
+        case .poaAnnua: return 0.08   // Moderate grain, patchy growth
+        case .fescue: return 0.03     // Very little grain
+        case .ryeGrass: return 0.04   // Minimal grain
+        }
+    }
+
+    /// How strongly grain deflects ball laterally (cross-grain break effect)
+    /// Expressed as fraction of gravity force equivalent
+    var grainDeflectionFactor: Float {
+        switch self {
+        case .bentGrass: return 0.02  // Minimal lateral push
+        case .bermudaGrass: return 0.12 // Strong lateral deflection
+        case .poaAnnua: return 0.05   // Moderate deflection, inconsistent
+        case .fescue: return 0.01     // Negligible lateral effect
+        case .ryeGrass: return 0.02   // Minimal lateral effect
+        }
+    }
+
+    /// Base friction multiplier relative to bent grass (stimpmeter baseline)
+    /// Values > 1.0 mean inherently slower than bent at same mow height
+    var frictionMultiplier: Float {
+        switch self {
+        case .bentGrass: return 1.0   // Baseline (stimpmeter calibrated on bent)
+        case .bermudaGrass: return 1.08 // Slightly more resistance from coarser blades
+        case .poaAnnua: return 1.05   // Slightly more than bent, bumpy surface
+        case .fescue: return 0.95     // Fine blades, slightly less resistance
+        case .ryeGrass: return 1.03   // Similar to bent, slightly coarser
         }
     }
 
@@ -16,6 +49,9 @@ enum GrassType: String, CaseIterable, Codable {
         switch self {
         case .bentGrass: return "Common in cooler climates, minimal grain"
         case .bermudaGrass: return "Common in warm climates, significant grain"
+        case .poaAnnua: return "Common on PGA Tour west coast, moderate grain"
+        case .fescue: return "Fine-bladed, fast surfaces, minimal grain"
+        case .ryeGrass: return "Overseeding grass, similar to bent"
         }
     }
 }
@@ -48,9 +84,15 @@ struct PhysicsParameters {
     let skidFrictionMultiplier: Float = 1.8 // Higher friction during skid phase
     let skidDistanceRatio: Float = 0.20 // 20% of total distance is skidding
 
+    // Grain direction (radians, 0 = north, clockwise)
+    // Grain grows toward the setting sun or water drainage
+    var grainDirection: Float = 0.0
+
     // Environmental
     var gravity: Float = 9.81
     var moistureLevel: Float = 0.0 // 0.0 = dry, 1.0 = very wet
+    var temperatureCelsius: Float = 20.0 // Ambient temperature
+    var altitudeMeters: Float = 0.0 // Elevation above sea level
 
     // Simulation settings
     let timeStep: Float = 0.002 // 2ms (500Hz) - optimized for mobile performance while maintaining accuracy
@@ -60,13 +102,30 @@ struct PhysicsParameters {
     // Rolling deceleration factor (5/7 from moment of inertia for pure rolling)
     static let rollingDecelerationFactor: Float = 5.0 / 7.0
 
-    init(stimpmeterSpeed: Float = 10.0, grassType: GrassType = .bentGrass, moistureLevel: Float = 0.0) {
+    init(stimpmeterSpeed: Float = 10.0, grassType: GrassType = .bentGrass, moistureLevel: Float = 0.0,
+         grainDirection: Float = 0.0, temperatureCelsius: Float = 20.0, altitudeMeters: Float = 0.0) {
         self.stimpmeterSpeed = stimpmeterSpeed
         self.grassType = grassType
         self.moistureLevel = moistureLevel
+        self.grainDirection = grainDirection
+        self.temperatureCelsius = temperatureCelsius
+        self.altitudeMeters = altitudeMeters
         self.ballMomentOfInertia = (2.0 / 5.0) * ballMass * pow(ballRadius, 2)
-        self.frictionCoefficient = Self.calculateFriction(from: stimpmeterSpeed, moisture: moistureLevel)
-        self.rollingResistance = Self.calculateRollingResistance(from: stimpmeterSpeed)
+
+        // Calculate base friction with environmental adjustments
+        var baseFriction = Self.calculateFriction(from: stimpmeterSpeed, moisture: moistureLevel)
+
+        // Apply grass type friction multiplier (bermuda inherently slower than bent, etc.)
+        baseFriction *= grassType.frictionMultiplier
+
+        // Apply temperature adjustment: warmer greens are faster (grass blades more pliable)
+        // Research: ~2% speed change per 5°C from baseline 20°C
+        let tempDelta = temperatureCelsius - 20.0
+        let tempFactor = 1.0 - (tempDelta / 5.0) * 0.02
+        baseFriction *= tempFactor
+
+        self.frictionCoefficient = baseFriction
+        self.rollingResistance = baseFriction * 0.8
     }
 
     /// Calculate friction coefficient from stimpmeter reading
@@ -133,13 +192,39 @@ struct PhysicsParameters {
         return (speed * speed) / (2.0 * deceleration)
     }
 
-    /// Apply grain effect to friction based on ball direction vs grain direction
-    /// grainAngle: 0 = with grain (faster), pi = against grain (slower)
-    func frictionWithGrain(ballDirection: Float, grainDirection: Float) -> Float {
-        let relativeAngle = ballDirection - grainDirection
-        // cos(0) = 1 (with grain, reduce friction), cos(pi) = -1 (against grain, increase friction)
-        let grainEffect = 1.0 - grassType.grainFactor * cos(relativeAngle)
+    /// Apply grain effect to friction based on ball travel direction vs grain direction
+    /// With grain = lower friction (faster), against grain = higher friction (slower)
+    func frictionWithGrain(ballDirection: SIMD2<Float>) -> Float {
+        guard grassType.grainFactor > 0.001 else { return frictionCoefficient }
+
+        let grainDir = SIMD2<Float>(sin(grainDirection), cos(grainDirection))
+        let ballDirLen = simd_length(ballDirection)
+        guard ballDirLen > 0.001 else { return frictionCoefficient }
+        let ballDirNorm = ballDirection / ballDirLen
+
+        // dot product: +1 = with grain, -1 = against grain
+        let alignment = simd_dot(ballDirNorm, grainDir)
+        // With grain (alignment=+1) reduces friction, against grain (alignment=-1) increases
+        let grainEffect = 1.0 - grassType.grainFactor * alignment
         return frictionCoefficient * grainEffect
+    }
+
+    /// Calculate lateral deflection force from grain (cross-grain push)
+    /// Returns a force direction in the XZ plane that pushes ball toward grain direction
+    /// The slower the ball moves, the more grain affects its direction
+    func grainDeflectionAcceleration(ballSpeed: Float) -> SIMD2<Float> {
+        guard grassType.grainDeflectionFactor > 0.001 else { return .zero }
+        guard ballSpeed > stoppedThreshold else { return .zero }
+
+        // Grain deflection is stronger at lower speeds (ball has less momentum)
+        // At very high speed, ball mostly overpowers grain
+        let speedFactor = min(1.0, 0.5 / max(ballSpeed, 0.1))
+
+        // Deflection force in grain direction
+        let grainDir = SIMD2<Float>(sin(grainDirection), cos(grainDirection))
+        let magnitude = grassType.grainDeflectionFactor * gravity * speedFactor
+
+        return grainDir * magnitude
     }
 
     /// Check if ball can be captured at given entry speed and offset

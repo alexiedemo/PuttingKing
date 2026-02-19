@@ -18,6 +18,9 @@ struct SettingsView: View {
                 // Green Conditions Section
                 greenConditionsSection
 
+                // Environmental Section
+                environmentalSection
+
                 // Display Section
                 displaySection
 
@@ -151,6 +154,120 @@ struct SettingsView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(settings.greenCondition.description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            // Grain direction (important for bermuda and poa)
+            if settings.grassType.grainFactor > 0.03 {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Grain Direction")
+                        Spacer()
+                        Text(grainDirectionLabel)
+                            .foregroundColor(.green)
+                            .fontWeight(.semibold)
+                    }
+
+                    Slider(value: $settings.grainDirectionDegrees, in: 0...359, step: 15)
+                        .accentColor(.green)
+
+                    HStack {
+                        Text("N")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("Grain grows toward this direction")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
+    private var grainDirectionLabel: String {
+        let deg = settings.grainDirectionDegrees
+        switch deg {
+        case 337.5..<360, 0..<22.5: return "N (\(Int(deg))°)"
+        case 22.5..<67.5: return "NE (\(Int(deg))°)"
+        case 67.5..<112.5: return "E (\(Int(deg))°)"
+        case 112.5..<157.5: return "SE (\(Int(deg))°)"
+        case 157.5..<202.5: return "S (\(Int(deg))°)"
+        case 202.5..<247.5: return "SW (\(Int(deg))°)"
+        case 247.5..<292.5: return "W (\(Int(deg))°)"
+        case 292.5..<337.5: return "NW (\(Int(deg))°)"
+        default: return "\(Int(deg))°"
+        }
+    }
+
+    // MARK: - Environmental Section
+
+    private var environmentalSection: some View {
+        Section(header: Text("Environment")) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Temperature")
+                    Spacer()
+                    if settings.useMetricUnits {
+                        Text(String(format: "%.0f°C", settings.temperatureCelsius))
+                            .foregroundColor(.orange)
+                            .fontWeight(.semibold)
+                    } else {
+                        Text(String(format: "%.0f°F", settings.temperatureCelsius * 9/5 + 32))
+                            .foregroundColor(.orange)
+                            .fontWeight(.semibold)
+                    }
+                }
+
+                Slider(value: $settings.temperatureCelsius, in: -10...50, step: 1)
+                    .accentColor(.orange)
+
+                HStack {
+                    Text("Cold (slower)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("Hot (faster)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Altitude")
+                    Spacer()
+                    if settings.useMetricUnits {
+                        Text(String(format: "%.0fm", settings.altitudeMeters))
+                            .foregroundColor(.cyan)
+                            .fontWeight(.semibold)
+                    } else {
+                        Text(String(format: "%.0fft", settings.altitudeMeters * 3.281))
+                            .foregroundColor(.cyan)
+                            .fontWeight(.semibold)
+                    }
+                }
+
+                Slider(value: $settings.altitudeMeters, in: 0...3000, step: 50)
+                    .accentColor(.cyan)
+
+                HStack {
+                    Text("Sea Level")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("High Altitude")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Temperature affects green speed. Warmer conditions make greens faster. Altitude has minimal effect on putting.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
