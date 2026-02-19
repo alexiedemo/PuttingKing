@@ -369,7 +369,7 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         var totalWeight: Float = 0
         var weightedY: Float = 0
 
-        for i in 0..<min(surface.vertices.count, 1000) {
+        for i in 0..<surface.vertices.count {
             let vertex = surface.vertices[i]
             let dist = position.horizontalDistance(to: vertex)
 

@@ -133,9 +133,17 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
 
         // Filter triangles within radius
         for i in stride(from: 0, to: surface.triangles.count, by: 3) {
+            guard i + 2 < surface.triangles.count else { continue }
+
             let idx0 = Int(surface.triangles[i])
             let idx1 = Int(surface.triangles[i + 1])
             let idx2 = Int(surface.triangles[i + 2])
+
+            // Validate indices are within bounds
+            guard idx0 < surface.vertices.count && idx1 < surface.vertices.count && idx2 < surface.vertices.count,
+                  idx0 < surface.normals.count && idx1 < surface.normals.count && idx2 < surface.normals.count else {
+                continue
+            }
 
             let v0 = surface.vertices[idx0]
             let v1 = surface.vertices[idx1]

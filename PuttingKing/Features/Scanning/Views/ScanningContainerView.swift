@@ -14,7 +14,17 @@ struct ScanningContainerView: View {
     @State private var analysisTimer: Timer?
 
     init() {
-        _viewModel = StateObject(wrappedValue: ScanningViewModel(settings: AppSettings.load()))
+        let container = DependencyContainer.shared
+        let settings = AppSettings.load()
+        _viewModel = StateObject(wrappedValue: ScanningViewModel(
+            settings: settings,
+            lidarService: container.lidarScanningService,
+            meshService: container.meshReconstructionService,
+            slopeService: container.slopeAnalysisService,
+            pathService: container.pathSimulationService,
+            breakService: container.breakCalculationService,
+            historyService: container.scanHistoryService
+        ))
     }
 
     var body: some View {
@@ -77,10 +87,10 @@ struct ScanningContainerView: View {
             }
         }
         .statusBar(hidden: true)
-        .onChange(of: viewModel.scanState) { newState in
+        .onChange(of: viewModel.scanState) { _, newState in
             handleStateChange(newState)
         }
-        .onChange(of: scenePhase) { newPhase in
+        .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .active:
                 // Resume session if we were previously running

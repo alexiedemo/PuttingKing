@@ -161,11 +161,10 @@ struct HomeView: View {
             VStack(spacing: 8) {
                 Slider(value: $stimpmeterSpeed, in: 6...14, step: 0.5)
                     .accentColor(.green)
-                    .onChange(of: stimpmeterSpeed) { newValue in
+                    .onChange(of: stimpmeterSpeed) { _, newValue in
                         var settings = appState.settings
                         settings.stimpmeterSpeed = newValue
                         appState.settings = settings
-                        settings.save()
 
                         // Haptic feedback
                         let impact = UIImpactFeedbackGenerator(style: .light)

@@ -45,7 +45,7 @@ struct ScanSession {
         }
 
         var canMarkBall: Bool {
-            self == .scanningGreen || self == .markingBall
+            self == .scanningGreen
         }
 
         var isScanning: Bool {

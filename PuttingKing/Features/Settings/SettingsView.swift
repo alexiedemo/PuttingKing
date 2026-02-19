@@ -47,7 +47,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .onChange(of: settings) { _ in
+        .onChange(of: settings) { _, _ in
             saveSettings()
         }
         .alert("Reset Settings", isPresented: $showingResetConfirmation) {
@@ -76,7 +76,7 @@ struct SettingsView: View {
 
                 Slider(value: $settings.stimpmeterSpeed, in: 6...14, step: 0.5)
                     .accentColor(.green)
-                    .onChange(of: settings.stimpmeterSpeed) { _ in
+                    .onChange(of: settings.stimpmeterSpeed) { _, _ in
                         if settings.hapticFeedbackEnabled {
                             // Use centralized tactile service
                             TactileFeedbackService.shared.playScanTexture()
