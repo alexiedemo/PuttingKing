@@ -79,10 +79,11 @@ struct PhysicsParameters {
         // Convert stimpmeter feet to meters
         let stimpmeterMeters = stimpmeter * 0.3048
 
-        // Derive friction: mu = v0^2 / (2 * g * d)
-        // Apply rolling deceleration factor for pure rolling
+        // Derive friction coefficient mu from stimpmeter kinematic equation:
+        // Ball decelerates at a = (5/7)*mu*g during pure rolling
+        // From 0 = v0^2 - 2*a*d: mu = v0^2 / (2 * (5/7) * g * d) = (7/5) * v0^2 / (2*g*d)
         var baseFriction = pow(stimpmeterInitialVelocity, 2) / (2 * 9.81 * stimpmeterMeters)
-        baseFriction *= rollingDecelerationFactor
+        baseFriction /= rollingDecelerationFactor
 
         // Apply moisture adjustment (wet greens are slower)
         // Research shows moisture can increase friction by 20-50%
