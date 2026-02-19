@@ -189,15 +189,26 @@ final class PathSimulationService: PathSimulationServiceProtocol {
             let slopeAngle = slopeSample.slopeAngle
 
             // Gravity component along slope (in XZ plane)
+            // During pure rolling, translational acceleration = (5/7)*g*sin(θ)
+            // because friction must provide torque for rolling constraint.
+            // During skidding, full g*sin(θ) applies (ball slides freely).
             var gravityForce = SIMD3<Float>.zero
             let gradientLength = simd_length(gradient)
             if gradientLength > 0.001 {
                 let gradientDir = gradient / gradientLength
-                // Gravity pulls ball down the slope
+                let slopeAccel: Float
+                switch motionPhase {
+                case .skidding:
+                    slopeAccel = g * sin(slopeAngle)
+                case .rolling:
+                    slopeAccel = PhysicsParameters.rollingDecelerationFactor * g * sin(slopeAngle)
+                case .stopped:
+                    slopeAccel = 0
+                }
                 gravityForce = SIMD3<Float>(
-                    g * sin(slopeAngle) * gradientDir.x,
+                    slopeAccel * gradientDir.x,
                     0,
-                    g * sin(slopeAngle) * gradientDir.y
+                    slopeAccel * gradientDir.y
                 )
             }
 
@@ -424,14 +435,24 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         let g = parameters.gravity
 
         // Gravity component along slope
+        // During pure rolling: a = (5/7)*g*sin(θ), during skidding: a = g*sin(θ)
         var gravityForce = SIMD3<Float>.zero
         let gradientLength = simd_length(gradient)
         if gradientLength > 0.001 {
             let gradientDir = gradient / gradientLength
+            let slopeAccel: Float
+            switch motionPhase {
+            case .skidding:
+                slopeAccel = g * sin(slopeAngle)
+            case .rolling:
+                slopeAccel = PhysicsParameters.rollingDecelerationFactor * g * sin(slopeAngle)
+            case .stopped:
+                slopeAccel = 0
+            }
             gravityForce = SIMD3<Float>(
-                g * sin(slopeAngle) * gradientDir.x,
+                slopeAccel * gradientDir.x,
                 0,
-                g * sin(slopeAngle) * gradientDir.y
+                slopeAccel * gradientDir.y
             )
         }
 
