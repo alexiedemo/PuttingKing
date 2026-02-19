@@ -117,12 +117,17 @@ final class ARSessionManager: NSObject, ObservableObject {
         
         if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
             configuration.sceneReconstruction = .meshWithClassification
+        } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+            configuration.sceneReconstruction = .mesh
         }
-        
+
         if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
             configuration.frameSemantics.insert(.sceneDepth)
         }
-        
+        if ARWorldTrackingConfiguration.supportsFrameSemantics(.smoothedSceneDepth) {
+            configuration.frameSemantics.insert(.smoothedSceneDepth)
+        }
+
         // Run with reset options
         arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         
@@ -139,8 +144,21 @@ final class ARSessionManager: NSObject, ObservableObject {
         guard let arView = arView else { return }
 
         let config = ARWorldTrackingConfiguration()
-        config.sceneReconstruction = .meshWithClassification
         config.planeDetection = [.horizontal]
+        config.environmentTexturing = .automatic
+
+        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
+            config.sceneReconstruction = .meshWithClassification
+        } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+            config.sceneReconstruction = .mesh
+        }
+
+        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+            config.frameSemantics.insert(.sceneDepth)
+        }
+        if ARWorldTrackingConfiguration.supportsFrameSemantics(.smoothedSceneDepth) {
+            config.frameSemantics.insert(.smoothedSceneDepth)
+        }
 
         arView.session.run(config)
     }
@@ -940,6 +958,8 @@ extension ARSessionManager: ARSessionDelegate {
     func sessionInterruptionEnded(_ session: ARSession) {
         DispatchQueue.main.async {
             self.isSessionRunning = true
+            // Restart LiDAR scanning if it was stopped during interruption
+            try? self.lidarService.startScanning()
         }
         print("[ARSession] Interruption ended - session resumed")
     }

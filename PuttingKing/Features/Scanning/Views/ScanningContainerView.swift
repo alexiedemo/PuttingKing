@@ -898,7 +898,7 @@ struct ScanningContainerView: View {
 
                     // Show why button is disabled
                     if !viewModel.canMarkBall {
-                        Text("Scan at least 20% first")
+                        Text("Scan at least 15% first")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.white.opacity(0.7))
                     }

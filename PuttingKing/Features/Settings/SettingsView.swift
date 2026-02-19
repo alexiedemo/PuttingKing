@@ -322,7 +322,6 @@ struct SettingsView: View {
     // MARK: - Helper Methods
 
     private func saveSettings() {
-        settings.save()
         appState.settings = settings
     }
 }
