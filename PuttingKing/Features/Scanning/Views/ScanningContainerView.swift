@@ -695,22 +695,6 @@ struct ScanningContainerView: View {
             .background(confidenceColor(line.confidence).opacity(0.15))
             .cornerRadius(20)
 
-            // Aim instruction - KEY USER GUIDANCE
-            HStack(spacing: 8) {
-                Image(systemName: "scope")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("Aim at the target point")
-                    .font(.system(size: 14, weight: .semibold))
-            }
-            .foregroundColor(.yellow)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(Color.yellow.opacity(0.2))
-            .cornerRadius(20)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.yellow.opacity(0.5), lineWidth: 1)
-            )
         }
     }
 
