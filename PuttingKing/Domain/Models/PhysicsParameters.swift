@@ -211,18 +211,29 @@ struct PhysicsParameters {
 
     /// Calculate lateral deflection force from grain (cross-grain push)
     /// Returns a force direction in the XZ plane that pushes ball toward grain direction
+    /// Deflection is strongest when ball rolls perpendicular to grain, zero when parallel
     /// The slower the ball moves, the more grain affects its direction
-    func grainDeflectionAcceleration(ballSpeed: Float) -> SIMD2<Float> {
+    func grainDeflectionAcceleration(ballSpeed: Float, ballDirection: SIMD2<Float>) -> SIMD2<Float> {
         guard grassType.grainDeflectionFactor > 0.001 else { return .zero }
         guard ballSpeed > stoppedThreshold else { return .zero }
 
+        let ballDirLen = simd_length(ballDirection)
+        guard ballDirLen > 0.001 else { return .zero }
+        let ballDirNorm = ballDirection / ballDirLen
+
+        // Grain direction vector
+        let grainDir = SIMD2<Float>(sin(grainDirection), cos(grainDirection))
+
+        // Cross-grain factor: deflection is max when perpendicular, zero when parallel
+        // |sin(angle)| = magnitude of cross product in 2D
+        let crossGrainFactor = abs(ballDirNorm.x * grainDir.y - ballDirNorm.y * grainDir.x)
+        guard crossGrainFactor > 0.001 else { return .zero }
+
         // Grain deflection is stronger at lower speeds (ball has less momentum)
-        // At very high speed, ball mostly overpowers grain
         let speedFactor = min(1.0, 0.5 / max(ballSpeed, 0.1))
 
-        // Deflection force in grain direction
-        let grainDir = SIMD2<Float>(sin(grainDirection), cos(grainDirection))
-        let magnitude = grassType.grainDeflectionFactor * gravity * speedFactor
+        // Deflection pushes ball toward grain direction, scaled by cross-grain component
+        let magnitude = grassType.grainDeflectionFactor * gravity * speedFactor * crossGrainFactor
 
         return grainDir * magnitude
     }

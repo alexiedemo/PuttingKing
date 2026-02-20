@@ -236,9 +236,9 @@ final class PathSimulationService: PathSimulationServiceProtocol {
                 frictionForce = -velocityDir * frictionMagnitude
             }
 
-            // Grain lateral deflection force (pushes ball toward grain direction)
+            // Grain lateral deflection force (cross-grain push)
             var grainForce = SIMD3<Float>.zero
-            let grainAccel = parameters.grainDeflectionAcceleration(ballSpeed: speed)
+            let grainAccel = parameters.grainDeflectionAcceleration(ballSpeed: speed, ballDirection: ballDir2D)
             if simd_length(grainAccel) > 0.0001 {
                 grainForce = SIMD3<Float>(grainAccel.x, 0, grainAccel.y)
             }
@@ -246,14 +246,16 @@ final class PathSimulationService: PathSimulationServiceProtocol {
             // Total acceleration = gravity + friction + grain deflection
             let acceleration = gravityForce + frictionForce + grainForce
 
-            // RK4 Integration for high accuracy
+            // RK4 Integration with force re-evaluation at intermediate points
             let (newPosition, newVelocity) = rk4Integrate(
                 position: position,
                 velocity: velocity,
                 acceleration: acceleration,
                 slopeData: slopeData,
                 dt: dt,
-                surface: surface
+                surface: surface,
+                parameters: parameters,
+                motionPhase: motionPhase
             )
 
             // Track distance traveled
@@ -322,33 +324,40 @@ final class PathSimulationService: PathSimulationServiceProtocol {
 
     // MARK: - Private Methods
 
-    /// RK4 integration step with slope-aware acceleration updates
+    /// RK4 integration step with slope-aware acceleration re-evaluation
     private func rk4Integrate(
         position: SIMD3<Float>,
         velocity: SIMD3<Float>,
         acceleration: SIMD3<Float>,
         slopeData: SlopeData,
         dt: Float,
-        surface: GreenSurface
+        surface: GreenSurface,
+        parameters: PhysicsParameters,
+        motionPhase: BallMotionPhase
     ) -> (position: SIMD3<Float>, velocity: SIMD3<Float>) {
-        // Standard RK4 integration
         // k1: derivatives at current state
         let k1v = acceleration * dt
         let k1p = velocity * dt
 
-        // k2: derivatives at midpoint using k1
+        // k2: derivatives at midpoint using k1, re-evaluate acceleration
+        let midPos1 = position + k1p / 2
         let midVel1 = velocity + k1v / 2
-        let k2v = acceleration * dt // Simplified: use same acceleration
+        let a2 = calculateAcceleration(at: midPos1, velocity: midVel1, slopeData: slopeData, parameters: parameters, motionPhase: motionPhase)
+        let k2v = a2 * dt
         let k2p = midVel1 * dt
 
-        // k3: derivatives at midpoint using k2
+        // k3: derivatives at midpoint using k2, re-evaluate acceleration
+        let midPos2 = position + k2p / 2
         let midVel2 = velocity + k2v / 2
-        let k3v = acceleration * dt
+        let a3 = calculateAcceleration(at: midPos2, velocity: midVel2, slopeData: slopeData, parameters: parameters, motionPhase: motionPhase)
+        let k3v = a3 * dt
         let k3p = midVel2 * dt
 
-        // k4: derivatives at endpoint using k3
+        // k4: derivatives at endpoint using k3, re-evaluate acceleration
+        let endPos = position + k3p
         let endVel = velocity + k3v
-        let k4v = acceleration * dt
+        let a4 = calculateAcceleration(at: endPos, velocity: endVel, slopeData: slopeData, parameters: parameters, motionPhase: motionPhase)
+        let k4v = a4 * dt
         let k4p = endVel * dt
 
         // Weighted average (RK4 formula)
@@ -364,11 +373,17 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         // Ensure velocity stays in XZ plane (ball rolls, doesn't bounce)
         newVelocity.y = 0
 
-        // Prevent velocity from reversing (ball can only slow down due to friction)
+        // Prevent friction-only reversal (friction never reverses a ball)
+        // But allow gravity on slopes to legitimately reverse ball direction (uphill rollback)
         let speed = simd_length(newVelocity)
         if speed > 0 && simd_dot(newVelocity, velocity) < 0 {
-            // Ball has reversed direction, stop it
-            newVelocity = .zero
+            // Check if slope gravity could cause this reversal
+            let gravityComponent = simd_dot(acceleration, simd_normalize(newVelocity))
+            if gravityComponent <= 0 {
+                // No slope force in the reversal direction — pure friction reversal, stop ball
+                newVelocity = .zero
+            }
+            // Otherwise: slope is pulling ball back downhill, allow the reversal
         }
 
         return (newPosition, newVelocity)
@@ -456,11 +471,13 @@ final class PathSimulationService: PathSimulationServiceProtocol {
             )
         }
 
+        // Ball travel direction in XZ plane for grain calculations
+        let ballDir2D = SIMD2<Float>(velocity.x, velocity.z)
+
         // Friction force with grain direction adjustment
         var frictionForce = SIMD3<Float>.zero
         if speed > 0.001 {
             let velocityDir = simd_normalize(velocity)
-            let ballDir2D = SIMD2<Float>(velocity.x, velocity.z)
             let grainAdjustedFriction = parameters.frictionWithGrain(ballDirection: ballDir2D)
             let frictionMagnitude: Float
 
@@ -476,9 +493,9 @@ final class PathSimulationService: PathSimulationServiceProtocol {
             frictionForce = -velocityDir * frictionMagnitude
         }
 
-        // Grain lateral deflection
+        // Grain lateral deflection (cross-grain push)
         var grainForce = SIMD3<Float>.zero
-        let grainAccel = parameters.grainDeflectionAcceleration(ballSpeed: speed)
+        let grainAccel = parameters.grainDeflectionAcceleration(ballSpeed: speed, ballDirection: ballDir2D)
         if simd_length(grainAccel) > 0.0001 {
             grainForce = SIMD3<Float>(grainAccel.x, 0, grainAccel.y)
         }
