@@ -71,7 +71,7 @@ struct PhysicsParameters {
     // Hole capture physics (from Bristol University research)
     static let maxCaptureSpeed: Float = 1.63 // m/s - maximum speed for any capture method
     static let simpleCaptureSpeed: Float = 1.31 // m/s - free-fall capture threshold
-    static let optimalCaptureSpeed: Float = 0.8 // m/s - ideal entry speed (12" past hole speed)
+    static let optimalCaptureSpeed: Float = 0.70 // m/s - ideal entry speed (~17" past hole, Penner/Pelz)
 
     // Surface interaction
     var stimpmeterSpeed: Float
@@ -132,7 +132,7 @@ struct PhysicsParameters {
     /// Based on physics: v0^2 = 2 * mu * g * d, where v0 = 1.83 m/s (stimpmeter initial velocity)
     /// Research data from USGA and professional studies
     static func calculateFriction(from stimpmeter: Float, moisture: Float = 0.0) -> Float {
-        // Stimpmeter releases ball at 1.83 m/s (from 20° ramp, 29.4" release point)
+        // Stimpmeter releases ball at 1.83 m/s (from 20° ramp, 30" release point)
         let stimpmeterInitialVelocity: Float = 1.83
 
         // Convert stimpmeter feet to meters
