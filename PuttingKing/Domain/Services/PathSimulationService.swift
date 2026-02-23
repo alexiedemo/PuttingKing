@@ -59,6 +59,65 @@ protocol PathSimulationServiceProtocol {
     ) -> SimulationResult
 }
 
+/// Pre-binned spatial grid for fast surface height lookups.
+/// Replaces O(n) brute-force vertex search with O(~k) where k ≈ vertices-per-cell.
+private struct SurfaceHeightCache {
+    private let cellSize: Float = 0.15  // ~15cm cells
+    private let invCellSize: Float
+    private var grid: [UInt64: [Int]] = [:]  // packed cell key → vertex indices
+    private let vertices: [SIMD3<Float>]
+
+    init(vertices: [SIMD3<Float>]) {
+        self.vertices = vertices
+        self.invCellSize = 1.0 / 0.15
+        grid.reserveCapacity(vertices.count / 4)
+        for (i, v) in vertices.enumerated() {
+            let key = Self.cellKey(x: v.x, z: v.z, inv: invCellSize)
+            grid[key, default: []].append(i)
+        }
+    }
+
+    private static func cellKey(x: Float, z: Float, inv: Float) -> UInt64 {
+        let cx = Int32(floor(x * inv))
+        let cz = Int32(floor(z * inv))
+        return UInt64(bitPattern: Int64(cx)) &<< 32 | UInt64(UInt32(bitPattern: cz))
+    }
+
+    /// Fast height lookup — searches only nearby grid cells
+    func projectHeight(at position: SIMD3<Float>, fallbackY: Float) -> Float {
+        let cx = Int32(floor(position.x * invCellSize))
+        let cz = Int32(floor(position.z * invCellSize))
+        let searchRadius: Float = 0.5
+        let searchRadiusSq = searchRadius * searchRadius
+
+        var totalWeight: Float = 0
+        var weightedY: Float = 0
+
+        // Search 5×5 cells to cover 0.5m radius
+        for dx: Int32 in -2...2 {
+            for dz: Int32 in -2...2 {
+                let keyCx = cx + dx
+                let keyCz = cz + dz
+                let key = UInt64(bitPattern: Int64(keyCx)) &<< 32 | UInt64(UInt32(bitPattern: keyCz))
+                guard let indices = grid[key] else { continue }
+                for i in indices {
+                    let vertex = vertices[i]
+                    let ddx = position.x - vertex.x
+                    let ddz = position.z - vertex.z
+                    let distSq = ddx * ddx + ddz * ddz
+                    if distSq < searchRadiusSq {
+                        let weight = 1.0 / max(sqrt(distSq), 0.01)
+                        weightedY += vertex.y * weight
+                        totalWeight += weight
+                    }
+                }
+            }
+        }
+
+        return totalWeight > 0 ? weightedY / totalWeight : fallbackY
+    }
+}
+
 /// Service that simulates ball physics on the green
 /// Implements research-based physics from Penner, Pelz, and Quintic Ball Roll studies
 final class PathSimulationService: PathSimulationServiceProtocol {
@@ -97,6 +156,9 @@ final class PathSimulationService: PathSimulationServiceProtocol {
 
         let dt = parameters.timeStep
         let g = parameters.gravity
+
+        // Build spatial cache once — O(n) construction, then O(1) lookups per timestep
+        let heightCache = SurfaceHeightCache(vertices: surface.vertices)
 
         // Record starting point
         path.append(PuttingLine.PathPoint(
@@ -255,7 +317,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
                 dt: dt,
                 surface: surface,
                 parameters: parameters,
-                motionPhase: motionPhase
+                motionPhase: motionPhase,
+                heightCache: heightCache
             )
 
             // Track distance traveled
@@ -334,7 +397,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         dt: Float,
         surface: GreenSurface,
         parameters: PhysicsParameters,
-        motionPhase: BallMotionPhase
+        motionPhase: BallMotionPhase,
+        heightCache: SurfaceHeightCache
     ) -> (position: SIMD3<Float>, velocity: SIMD3<Float>) {
         // k1: derivatives at current state
         let k1v = acceleration * dt
@@ -368,8 +432,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         let posSum = k1p + k2p * 2 + k3p * 2 + k4p
         var newPosition = position + posSum / 6
 
-        // Keep ball on surface (project Y coordinate)
-        newPosition = projectOntoSurface(newPosition, surface: surface, slopeData: slopeData)
+        // Keep ball on surface (project Y coordinate via spatial cache)
+        newPosition.y = heightCache.projectHeight(at: newPosition, fallbackY: newPosition.y)
 
         // Ensure velocity stays in XZ plane (ball rolls, doesn't bounce)
         newVelocity.y = 0
@@ -388,49 +452,6 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         }
 
         return (newPosition, newVelocity)
-    }
-
-    /// Project position onto the green surface using barycentric interpolation
-    private func projectOntoSurface(
-        _ position: SIMD3<Float>,
-        surface: GreenSurface,
-        slopeData: SlopeData
-    ) -> SIMD3<Float> {
-        // Find nearest vertex to get approximate height
-        // Use spatial hashing for better performance with large meshes
-        var minDist: Float = .infinity
-        var nearestY: Float = position.y
-        var nearestNormal: SIMD3<Float>?
-
-        // Sample nearby vertices (optimization: could use spatial index)
-        let searchRadius: Float = 0.5 // 50cm search radius
-        var totalWeight: Float = 0
-        var weightedY: Float = 0
-
-        for i in 0..<surface.vertices.count {
-            let vertex = surface.vertices[i]
-            let dist = position.horizontalDistance(to: vertex)
-
-            if dist < searchRadius {
-                // Inverse distance weighting for smoother interpolation
-                let weight = 1.0 / max(dist, 0.01)
-                weightedY += vertex.y * weight
-                totalWeight += weight
-
-                if dist < minDist {
-                    minDist = dist
-                    nearestY = vertex.y
-                    if i < surface.normals.count {
-                        nearestNormal = surface.normals[i]
-                    }
-                }
-            }
-        }
-
-        // Use weighted average if we found nearby vertices
-        let finalY = totalWeight > 0 ? weightedY / totalWeight : nearestY
-
-        return SIMD3<Float>(position.x, finalY, position.z)
     }
 
     /// Calculate acceleration at a given position considering slope and grain

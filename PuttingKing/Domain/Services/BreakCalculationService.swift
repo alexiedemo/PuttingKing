@@ -445,6 +445,7 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
     }
 
     /// Enhanced closest approach search with wider angle exploration
+    /// Respects cancellation and a 3-second hard timeout to stay within overall budget.
     private func findClosestApproachEnhanced(
         from ball: BallPosition,
         to hole: HolePosition,
@@ -454,6 +455,8 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         baseSpeed: Float,
         directDirection: SIMD3<Float>
     ) -> (result: SimulationResult, speed: Float, angle: Float, confidence: Float)? {
+        let fallbackStart = CFAbsoluteTimeGetCurrent()
+        let fallbackTimeout: Double = 3.0  // Hard cap for the fallback phase
         var best: (result: SimulationResult, speed: Float, angle: Float, distance: Float)?
 
         // Try multiple speeds and angles to find closest approach
@@ -462,6 +465,12 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
 
         for speed in speeds {
             for angle in angles {
+                if Task.isCancelled { break }
+                if CFAbsoluteTimeGetCurrent() - fallbackStart > fallbackTimeout {
+                    print("[BreakCalc] Fallback timeout after \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - fallbackStart))s")
+                    break
+                }
+
                 let rotatedDirection = rotateDirectionHorizontal(directDirection, by: angle)
 
                 let result = pathSimulationService.simulatePutt(
@@ -480,6 +489,8 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
                     best = (result, speed, angle, closestDistance)
                 }
             }
+            if Task.isCancelled { break }
+            if CFAbsoluteTimeGetCurrent() - fallbackStart > fallbackTimeout { break }
         }
 
         guard let result = best else { return nil }
