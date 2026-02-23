@@ -263,9 +263,11 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
 
         // Accumulate face normals at each vertex
         for i in stride(from: 0, to: triangles.count, by: 3) {
+            guard i + 2 < triangles.count else { continue }
             let i0 = Int(triangles[i])
             let i1 = Int(triangles[i + 1])
             let i2 = Int(triangles[i + 2])
+            guard i0 < vertices.count && i1 < vertices.count && i2 < vertices.count else { continue }
 
             let v0 = vertices[i0]
             let v1 = vertices[i1]

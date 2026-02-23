@@ -531,9 +531,8 @@ final class ARSessionManager: NSObject, ObservableObject {
             }
         }
         
-        // Add remaining points
+        // Add final point (points[count-2] already included as last interpolated point at tVal=1.0)
         if points.count > 3 {
-             smoothed.append(points[points.count - 2])
              smoothed.append(points[points.count - 1])
         }
         

@@ -265,6 +265,7 @@ final class ScanningViewModel: ObservableObject {
                 }
                 group.addTask { @MainActor in
                     try? await Task.sleep(nanoseconds: 15_000_000_000)
+                    guard !Task.isCancelled else { return }
                     if self.isAnalyzing {
                         self.error = .unknown("Analysis timed out. Try scanning again.")
                         self.scanState = .error(.unknown("Analysis timed out. Try scanning again."))
