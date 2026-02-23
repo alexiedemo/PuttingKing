@@ -37,6 +37,7 @@
 		SVC004 /* PathSimulationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC014 /* PathSimulationService.swift */; };
 		SVC005 /* BreakCalculationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC015 /* BreakCalculationService.swift */; };
 		SVC006 /* ScanHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC028 /* ScanHistoryService.swift */; };
+		UTIL001 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC029 /* HapticManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -72,6 +73,7 @@
 		SRC026 /* ScanRecord+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScanRecord+CoreDataClass.swift"; sourceTree = "<group>"; };
 		SRC027 /* ScanRecord+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScanRecord+CoreDataProperties.swift"; sourceTree = "<group>"; };
 		SRC028 /* ScanHistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanHistoryService.swift; sourceTree = "<group>"; };
+		SRC029 /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -230,10 +232,19 @@
 				DOMAIN_GROUP /* Domain */,
 				FEATURES_GROUP /* Features */,
 				PRESENTATION_GROUP /* Presentation */,
+				UTILITIES_GROUP /* Utilities */,
 				RESOURCES_GROUP /* Resources */,
 				INFO_PLIST /* Info.plist */,
 			);
 			path = PuttingKing;
+			sourceTree = "<group>";
+		};
+		UTILITIES_GROUP /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				SRC029 /* HapticManager.swift */,
+			);
+			path = Utilities;
 			sourceTree = "<group>";
 		};
 		RESOURCES_GROUP /* Resources */ = {
@@ -397,6 +408,7 @@
 				FT005 /* OnboardingView.swift in Sources */,
 				FT006 /* HistoryView.swift in Sources */,
 				9BD671A47DBE49A7DA912497 /* ScanningResultView.swift in Sources */,
+				UTIL001 /* HapticManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
