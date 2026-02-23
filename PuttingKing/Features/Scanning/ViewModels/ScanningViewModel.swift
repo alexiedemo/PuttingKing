@@ -296,6 +296,7 @@ final class ScanningViewModel: ObservableObject {
     func startNewPutt() {
         ballPosition = nil
         puttingLine = nil
+        error = nil
 
         // Reset scanning
         lidarService.reset()
@@ -354,6 +355,7 @@ final class ScanningViewModel: ObservableObject {
         analysisTask = nil
 
         holePosition = nil
+        error = nil
         currentSession?.holePosition = nil
 
         // Stop and reset scanning

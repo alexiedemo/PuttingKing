@@ -10,6 +10,7 @@ struct ScanningContainerView: View {
     @State private var pulseAnimation = false
     @State private var crosshairScale: CGFloat = 1.0
     @State private var showPositionError = false
+    @State private var validationErrorMessage: String?
     @State private var analysisProgress: Double = 0
     @State private var analysisTimer: Timer?
     @State private var isViewVisible: Bool = true  // Guards stale closures after dismissal
@@ -84,6 +85,13 @@ struct ScanningContainerView: View {
                     .zIndex(100)
             }
 
+            // Validation error toast (distance check, etc.)
+            if let message = validationErrorMessage {
+                validationErrorToast(message: message)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(100)
+            }
+
             // AR tracking warning
             if arSessionManager.trackingState != .normal && viewModel.scanState != .idle && viewModel.scanState != .displayingResult {
                 trackingWarningBanner
@@ -94,6 +102,13 @@ struct ScanningContainerView: View {
         .statusBar(hidden: true)
         .onChange(of: viewModel.scanState) { newState in
             handleStateChange(newState)
+        }
+        .onChange(of: viewModel.error?.message) { errorMessage in
+            // Show validation errors as a toast when NOT in the .error scan state
+            // (e.g., distance validation failures during .markingBall)
+            guard let message = errorMessage else { return }
+            if case .error = viewModel.scanState { return }
+            showValidationError(message)
         }
         .onChange(of: scenePhase) { newPhase in
             switch newPhase {
@@ -113,15 +128,15 @@ struct ScanningContainerView: View {
     // MARK: - State Change Handling
 
     private func handleStateChange(_ newState: ScanSession.ScanState) {
+        // Always stop the analysis timer when leaving the analyzing state
+        if newState != .analyzing {
+            stopAnalysisProgress()
+        }
+
         guard appState.settings.hapticFeedbackEnabled else {
             // Still handle non-haptic state changes
-            switch newState {
-            case .analyzing:
+            if newState == .analyzing {
                 startAnalysisProgress()
-            case .displayingResult, .error:
-                stopAnalysisProgress()
-            default:
-                break
             }
             updateCrosshairState()
             return
@@ -155,11 +170,9 @@ struct ScanningContainerView: View {
                 let generator = UINotificationFeedbackGenerator()
                 generator.notificationOccurred(.success)
             }
-            stopAnalysisProgress()
         case .error:
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.error)
-            stopAnalysisProgress()
         default:
             break
         }
@@ -181,6 +194,7 @@ struct ScanningContainerView: View {
     }
 
     private func stopAnalysisProgress() {
+        guard analysisTimer != nil else { return }
         analysisTimer?.invalidate()
         analysisTimer = nil
         withAnimation(.easeOut(duration: 0.3)) {
@@ -328,6 +342,45 @@ struct ScanningContainerView: View {
             .padding(.top, 60)
 
             Spacer()
+        }
+    }
+
+    private func validationErrorToast(message: String) -> some View {
+        VStack {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.red)
+                Text(message)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(Color.black.opacity(0.85))
+            .cornerRadius(12)
+            .padding(.top, 60)
+
+            Spacer()
+        }
+    }
+
+    private func showValidationError(_ message: String) {
+        if appState.settings.hapticFeedbackEnabled {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.error)
+        }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            validationErrorMessage = message
+        }
+
+        // Auto-dismiss after 3.5 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+            guard self.isViewVisible else { return }
+            withAnimation(.easeInOut(duration: 0.3)) {
+                self.validationErrorMessage = nil
+            }
         }
     }
 
