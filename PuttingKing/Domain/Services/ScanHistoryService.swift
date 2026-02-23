@@ -130,6 +130,7 @@ final class ScanHistoryService: ObservableObject {
 
     func deleteScans(at offsets: IndexSet) {
         for index in offsets {
+            guard index >= 0 && index < recentScans.count else { continue }
             let scan = recentScans[index]
             persistenceController.viewContext.delete(scan)
         }

@@ -184,6 +184,7 @@ final class ScanningViewModel: ObservableObject {
         puttingLine = nil
         error = nil
         vertexCount = 0
+        isAnalyzing = false
 
         // Reset LiDAR service
         lidarService.reset()
@@ -286,6 +287,7 @@ final class ScanningViewModel: ObservableObject {
         lidarService.reset()
         scanProgress = 0
         vertexCount = 0
+        isAnalyzing = false
 
         scanState = .scanningGreen
         currentSession?.state = .scanningGreen
@@ -317,6 +319,7 @@ final class ScanningViewModel: ObservableObject {
         error = nil
         vertexCount = 0
         scanProgress = 0
+        isAnalyzing = false
 
         print("[ViewModel] Cancelled scan")
     }
@@ -338,6 +341,7 @@ final class ScanningViewModel: ObservableObject {
         lidarService.reset()
         scanProgress = 0
         vertexCount = 0
+        isAnalyzing = false
 
         scanState = .markingHole
         currentSession?.state = .markingHole
