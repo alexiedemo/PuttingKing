@@ -78,6 +78,21 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
         let maxSlope = gradientSamples.map(\.slopePercentage).max() ?? 0
         let avgSlope = gradientSamples.map(\.slopePercentage).reduce(0, +) / Float(gradientSamples.count)
 
+        // Carpet / Indoor Floor detection:
+        // LiDAR is noisy and will create false 1-2% slopes on perfectly flat floors.
+        // If the entire scan has an average slope < 1.5% and no part is steeper than 3.5%, 
+        // it's highly likely an indoor floor, not a real golf green.
+        let isIndoorFloor = avgSlope < 1.5 && maxSlope < 3.5
+        
+        if isIndoorFloor {
+            for i in 0..<gradientSamples.count {
+                gradientSamples[i].gradient = .zero
+                gradientSamples[i].slopePercentage = 0
+                gradientSamples[i].slopeAngle = 0
+            }
+            print("[SlopeAnalysis] Clamped gradients to 0 (Detected flat indoor floor - Avg: \(String(format: "%.1f", avgSlope))%, Max: \(String(format: "%.1f", maxSlope))%)")
+        }
+
         // Calculate dominant direction (weighted average of gradients)
         let totalGradient = gradientSamples.reduce(SIMD2<Float>.zero) { $0 + $1.gradient }
         let dominantDirection = simd_length(totalGradient) > 0.001

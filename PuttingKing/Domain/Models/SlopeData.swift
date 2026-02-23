@@ -14,9 +14,9 @@ struct SlopeData {
 
     struct GradientSample {
         let position: SIMD3<Float>
-        let gradient: SIMD2<Float>
-        let slopePercentage: Float
-        let slopeAngle: Float
+        var gradient: SIMD2<Float>
+        var slopePercentage: Float
+        var slopeAngle: Float
 
         /// Returns the slope direction as a unit vector in the XZ plane
         var slopeDirection: SIMD2<Float> {
