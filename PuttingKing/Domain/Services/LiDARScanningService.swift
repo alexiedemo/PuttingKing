@@ -122,6 +122,20 @@ final class LiDARScanningService: NSObject, ObservableObject {
         print("[LiDAR] Stopped scanning")
     }
 
+    /// Resume scanning without clearing existing data (e.g., after app foreground).
+    /// Unlike startScanning(), this preserves all collected mesh anchors.
+    func resumeScanning() {
+        meshAnchorsLock.lock()
+        _internalIsScanning = true
+        meshAnchorsLock.unlock()
+
+        DispatchQueue.main.async { [weak self] in
+            self?.isScanning = true
+        }
+
+        print("[LiDAR] Resumed scanning (preserved existing data)")
+    }
+
     /// Reset scan data
     func reset() {
         meshAnchorsLock.lock()

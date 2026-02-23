@@ -351,6 +351,14 @@ final class ScanningViewModel: ObservableObject {
         cancellables.removeAll()
     }
 
+    /// Resume LiDAR data collection if we're in a scanning state.
+    /// Called after app returns from background to restore the scanning pipeline.
+    func resumeScanningIfNeeded() {
+        guard scanState == .scanningGreen else { return }
+        lidarService.resumeScanning()
+        print("[ViewModel] Resumed LiDAR scanning after foreground")
+    }
+
     /// Redo hole marking
     func redoHole() {
         // Cancel any running analysis task to prevent stale state updates
@@ -358,8 +366,11 @@ final class ScanningViewModel: ObservableObject {
         analysisTask = nil
 
         holePosition = nil
+        ballPosition = nil
+        puttingLine = nil
         error = nil
         currentSession?.holePosition = nil
+        currentSession?.ballPosition = nil
 
         // Stop and reset scanning
         lidarService.stopScanning()

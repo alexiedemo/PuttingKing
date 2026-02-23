@@ -117,6 +117,8 @@ struct ScanningContainerView: View {
                 if viewModel.scanState != .idle && viewModel.scanState != .error(.lidarUnavailable) {
                     arSessionManager.resumeSession()
                 }
+                // Re-enable LiDAR data collection if we were scanning
+                viewModel.resumeScanningIfNeeded()
             case .background, .inactive:
                 arSessionManager.pauseSession()
             @unknown default:
