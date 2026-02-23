@@ -168,7 +168,8 @@ struct AppIconGenerator {
         }
     }
 
-    /// Export icon to Documents directory
+    #if DEBUG
+    /// Export icon to Documents directory (debug builds only)
     static func exportIcon() {
         guard let icon = generateIcon(size: 1024) else {
             print("Failed to generate icon")
@@ -190,5 +191,6 @@ struct AppIconGenerator {
             print("Failed to save icon: \(error)")
         }
     }
+    #endif
 }
 

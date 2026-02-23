@@ -82,7 +82,7 @@ struct SettingsView: View {
                     .onChange(of: settings.stimpmeterSpeed) { _ in
                         if settings.hapticFeedbackEnabled {
                             // Use centralized tactile service
-                            TactileFeedbackService.shared.playScanTexture()
+                            HapticManager.shared.playScanTexture()
                         }
                     }
 

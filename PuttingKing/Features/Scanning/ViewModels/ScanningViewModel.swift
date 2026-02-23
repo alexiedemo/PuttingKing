@@ -133,8 +133,8 @@ final class ScanningViewModel: ObservableObject {
                 self.vertexCount = count
                 self.updateScanProgress()
                 
-                // Play subtle texture haptic (Phase 2 Optimization)
-                TactileFeedbackService.shared.playScanTexture()
+                // Play subtle texture haptic via the canonical HapticManager singleton
+                HapticManager.shared.playScanTexture()
             }
             .store(in: &cancellables)
 
@@ -520,78 +520,5 @@ final class ScanningViewModel: ObservableObject {
             confidence: 0.25, // Low confidence - fallback straight line
             distance: distance
         )
-    }
-}
-
-// MARK: - Services (Colocated for build simplicity)
-
-import CoreHaptics
-
-/// Service for advanced haptic feedback
-final class TactileFeedbackService {
-    static let shared = TactileFeedbackService()
-    
-    private var hapticEngine: CHHapticEngine?
-    private var isEnabled: Bool = true
-    
-    private init() {
-        prepareHapticEngine()
-    }
-    
-    /// Play a subtle texture haptic simulating surface scanning
-    func playScanTexture() {
-        guard isEnabled, CHHapticEngine.capabilitiesForHardware().supportsHaptics, let engine = hapticEngine else { return }
-        
-        do {
-            // Restart if needed
-            try? engine.start()
-            
-            // Create a low-rumble continuous texture
-            let rumble = CHHapticEvent(
-                eventType: .hapticContinuous,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.1)
-                ],
-                relativeTime: 0,
-                duration: 0.15
-            )
-            
-            // Overlay random transient ticks for "digital" feel
-            var events = [rumble]
-            
-            for i in 0..<3 {
-                let tick = CHHapticEvent(
-                    eventType: .hapticTransient,
-                    parameters: [
-                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4),
-                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8)
-                    ],
-                    relativeTime: 0.04 * Double(i + 1)
-                )
-                events.append(tick)
-            }
-            
-            let pattern = try CHHapticPattern(events: events, parameters: [])
-            let player = try engine.makePlayer(with: pattern)
-            try player.start(atTime: CHHapticTimeImmediate)
-        } catch {
-            print("[TactileFeedback] Failed to play scan texture: \(error)")
-        }
-    }
-    
-    private func prepareHapticEngine() {
-        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
-        
-        do {
-            hapticEngine = try CHHapticEngine()
-            try hapticEngine?.start()
-            
-            hapticEngine?.resetHandler = { [weak self] in
-                try? self?.hapticEngine?.start()
-            }
-        } catch {
-            print("Tactile engine creation error: \(error)")
-        }
     }
 }
