@@ -18,6 +18,7 @@ struct ContentView: View {
                 case .history:
                     HistoryView()
                 case .onboarding:
+                    // Reached only via AppState.resetOnboarding() from Settings
                     OnboardingView()
                 }
             }

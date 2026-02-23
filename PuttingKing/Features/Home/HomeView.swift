@@ -7,6 +7,7 @@ struct HomeView: View {
     @State private var showStartButton = false
 
     init() {
+        // Initial value — will be kept in sync via .onChange below
         _stimpmeterSpeed = State(initialValue: AppSettings.load().stimpmeterSpeed)
     }
 
@@ -46,12 +47,18 @@ struct HomeView: View {
             }
             .navigationBarHidden(true)
             .onAppear {
+                // Sync slider with latest live settings whenever HomeView appears
+                stimpmeterSpeed = appState.settings.stimpmeterSpeed
                 withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
                     animateGradient = true
                 }
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3)) {
                     showStartButton = true
                 }
+            }
+            // Keep local slider in sync if settings change from another screen
+            .onChange(of: appState.settings.stimpmeterSpeed) { newValue in
+                stimpmeterSpeed = newValue
             }
         }
     }

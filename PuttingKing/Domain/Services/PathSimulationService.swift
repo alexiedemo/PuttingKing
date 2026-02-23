@@ -89,6 +89,7 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         let skidDistance = estimatedDistance * parameters.skidDistanceRatio
         var distanceTraveled: Float = 0
         var motionPhase: BallMotionPhase = .skidding
+        var stepCount: Int = 0  // Integer counter for path recording — avoids float modulo drift
 
         // Track closest approach for lip-out detection
         var closestApproach: Float = .infinity
@@ -264,9 +265,10 @@ final class PathSimulationService: PathSimulationServiceProtocol {
             position = newPosition
             velocity = newVelocity
             time += dt
+            stepCount += 1
 
-            // Record path point every 10ms (for smoothness)
-            if Int(time / dt) % 10 == 0 {
+            // Record path point every 10 steps (exact integer — avoids float modulo drift)
+            if stepCount % 10 == 0 {
                 path.append(PuttingLine.PathPoint(
                     position: position,
                     velocity: velocity,
