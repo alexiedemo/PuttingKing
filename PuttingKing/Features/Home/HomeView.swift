@@ -60,6 +60,11 @@ struct HomeView: View {
             .onChange(of: appState.settings.stimpmeterSpeed) { newValue in
                 stimpmeterSpeed = newValue
             }
+            .alert("LiDAR Required", isPresented: $showLiDARAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("PuttingKing requires a device with a LiDAR scanner (iPhone 12 Pro or later, iPad Pro). Your device does not have LiDAR.")
+            }
         }
     }
 
@@ -232,15 +237,23 @@ struct HomeView: View {
     // MARK: - Start Button
 
     @State private var isStarting = false
+    @State private var showLiDARAlert = false
 
     private var startButton: some View {
         Button(action: {
             guard !isStarting else { return }
+
+            // Block non-LiDAR devices with a clear alert
+            guard LiDARScanningService.isLiDARSupported else {
+                showLiDARAlert = true
+                return
+            }
+
             isStarting = true
-            
+
             let impact = UIImpactFeedbackGenerator(style: .medium)
             impact.impactOccurred()
-            
+
             // Brief loading state for smoother transition
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 appState.currentScreen = .scanning

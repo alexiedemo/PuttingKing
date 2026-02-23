@@ -187,7 +187,7 @@ struct HistoryView: View {
         HStack(spacing: 20) {
             StatView(title: "Scans", value: "\(filteredScans.count)")
             Divider().frame(height: 30)
-            StatView(title: "Avg Distance", value: String(format: "%.1fm", averageDistance))
+            StatView(title: "Avg Distance", value: formattedAverageDistance)
             Divider().frame(height: 30)
             StatView(title: "Avg Confidence", value: "\(averageConfidence)%")
         }
@@ -201,6 +201,22 @@ struct HistoryView: View {
         guard !filteredScans.isEmpty else { return 0 }
         let total = filteredScans.reduce(0) { $0 + $1.distance }
         return total / Float(filteredScans.count)
+    }
+
+    private var formattedAverageDistance: String {
+        if appState.settings.useMetricUnits {
+            return String(format: "%.1fm", averageDistance)
+        } else {
+            return String(format: "%.0fft", averageDistance * 3.28084)
+        }
+    }
+
+    private func formattedDistance(_ meters: Float) -> String {
+        if appState.settings.useMetricUnits {
+            return String(format: "%.1fm", meters)
+        } else {
+            return String(format: "%.0fft", meters * 3.28084)
+        }
     }
 
     private var averageConfidence: Int {
@@ -278,7 +294,7 @@ struct HistoryView: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                Text(String(format: "%.1fm", scan.distance))
+                Text(formattedDistance(scan.distance))
                     .font(.headline)
                     .foregroundColor(.green)
 
@@ -310,11 +326,13 @@ struct HistoryView: View {
     private func speedColor(_ speed: String?) -> Color {
         switch speed {
         case "gentle":
-            return .blue
+            return .cyan
+        case "moderate":
+            return .green
         case "firm":
-            return .red
-        default:
             return .orange
+        default:
+            return .green
         }
     }
 }

@@ -103,7 +103,11 @@ struct ARViewContainer: UIViewRepresentable {
             // Only display putting line once
             if !coordinator.hasDisplayedLine,
                let line = viewModel.puttingLine {
-                arSessionManager.displayPuttingLine(line, color: viewModel.settings.lineColor)
+                arSessionManager.displayPuttingLine(
+                    line,
+                    color: viewModel.settings.lineColor,
+                    showConfidenceBand: viewModel.settings.showConfidenceBand
+                )
                 coordinator.hasDisplayedLine = true
             }
 

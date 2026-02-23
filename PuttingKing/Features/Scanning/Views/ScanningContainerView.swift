@@ -11,6 +11,7 @@ struct ScanningContainerView: View {
     @State private var crosshairScale: CGFloat = 1.0
     @State private var showPositionError = false
     @State private var analysisProgress: Double = 0
+    @State private var showCancelConfirmation = false
     @State private var analysisTimer: Timer?
     @State private var isViewVisible: Bool = true  // Guards stale closures after dismissal
 
@@ -417,9 +418,16 @@ struct ScanningContainerView: View {
     private var topBar: some View {
         HStack {
             Button(action: {
-                withAnimation {
-                    viewModel.cancel()
-                    appState.currentScreen = .home
+                // Show confirmation if scan is actively in progress
+                let activeStates: [ScanSession.ScanState] = [.scanningGreen, .markingBall, .analyzing]
+                let isActive = activeStates.contains(where: { statesMatch($0, viewModel.scanState) })
+                if isActive {
+                    showCancelConfirmation = true
+                } else {
+                    withAnimation {
+                        viewModel.cancel()
+                        appState.currentScreen = .home
+                    }
                 }
             }) {
                 Image(systemName: "xmark")
@@ -428,6 +436,17 @@ struct ScanningContainerView: View {
                     .frame(width: 44, height: 44)
                     .background(.ultraThinMaterial.opacity(0.8))
                     .clipShape(Circle())
+            }
+            .alert("Cancel Scan?", isPresented: $showCancelConfirmation) {
+                Button("Cancel Scan", role: .destructive) {
+                    withAnimation {
+                        viewModel.cancel()
+                        appState.currentScreen = .home
+                    }
+                }
+                Button("Continue", role: .cancel) { }
+            } message: {
+                Text("Your current scan progress will be lost.")
             }
 
             Spacer()
@@ -894,6 +913,18 @@ struct ScanningContainerView: View {
             withAnimation(.easeInOut(duration: 0.3)) {
                 self.showPositionError = false
             }
+        }
+    }
+
+    private func statesMatch(_ a: ScanSession.ScanState, _ b: ScanSession.ScanState) -> Bool {
+        switch (a, b) {
+        case (.idle, .idle), (.markingHole, .markingHole), (.scanningGreen, .scanningGreen),
+             (.markingBall, .markingBall), (.analyzing, .analyzing), (.displayingResult, .displayingResult):
+            return true
+        case (.error, .error):
+            return true
+        default:
+            return false
         }
     }
 

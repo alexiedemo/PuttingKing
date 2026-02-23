@@ -280,7 +280,14 @@ struct SettingsView: View {
         Section(header: Text("Display")) {
             Toggle("Use Metric Units", isOn: $settings.useMetricUnits)
 
-            Toggle("Show Slope Heatmap", isOn: $settings.showSlopeHeatmap)
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Show Slope Heatmap", isOn: $settings.showSlopeHeatmap)
+                if settings.showSlopeHeatmap {
+                    Text("Coming soon - heatmap visualization is in development")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
 
             Toggle("Show Confidence Band", isOn: $settings.showConfidenceBand)
 
@@ -314,7 +321,14 @@ struct SettingsView: View {
 
     private var accessibilitySection: some View {
         Section(header: Text("Accessibility")) {
-            Toggle("High Contrast Mode", isOn: $settings.highContrastMode)
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("High Contrast Mode", isOn: $settings.highContrastMode)
+                if settings.highContrastMode {
+                    Text("Coming soon - high contrast visuals are in development")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
 
             Picker("Color Blind Mode", selection: $settings.colorblindMode) {
                 ForEach(AppSettings.ColorblindMode.allCases, id: \.self) { mode in
@@ -328,7 +342,7 @@ struct SettingsView: View {
                     Image(systemName: "eye.fill")
                         .foregroundColor(.blue)
                         .font(.caption)
-                    Text("Colors will be adjusted for better visibility")
+                    Text("Coming soon - color adjustments are in development")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
