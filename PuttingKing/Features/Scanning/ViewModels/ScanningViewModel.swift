@@ -124,6 +124,7 @@ final class ScanningViewModel: ObservableObject {
         // Use dropFirst to skip initial value during setup and throttle to reduce UI updates
         lidarService.$vertexCount
             .dropFirst()
+            .removeDuplicates()
             .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] count in
@@ -132,9 +133,11 @@ final class ScanningViewModel: ObservableObject {
                 guard self.scanState == .scanningGreen else { return }
                 self.vertexCount = count
                 self.updateScanProgress()
-                
-                // Play subtle texture haptic via the canonical HapticManager singleton
-                HapticManager.shared.playScanTexture()
+
+                // Only fire haptic when actually receiving mesh data
+                if count > 0 {
+                    HapticManager.shared.playScanTexture()
+                }
             }
             .store(in: &cancellables)
 

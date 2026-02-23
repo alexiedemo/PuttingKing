@@ -225,6 +225,11 @@ final class LiDARScanningService: NSObject, ObservableObject {
         for updatedAnchor in meshAnchors {
             if let index = _internalMeshAnchors.firstIndex(where: { $0.identifier == updatedAnchor.identifier }) {
                 _internalMeshAnchors[index] = updatedAnchor
+            } else {
+                // Anchor not in internal storage (cleared by reset) — recapture it.
+                // ARKit only fires didAdd once per anchor lifetime; subsequent
+                // deliveries come through didUpdate, so we must re-add here.
+                _internalMeshAnchors.append(updatedAnchor)
             }
         }
 
