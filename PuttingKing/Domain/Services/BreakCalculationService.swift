@@ -137,6 +137,12 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
                 let speed = baseSpeed * speedMult
 
                 for angleStep in 0..<angleSteps {
+                    // Check cancellation
+                    if Task.isCancelled {
+                        print("[BreakCalc] Task cancelled, exiting grid search early")
+                        return [:]
+                    }
+
                     // Check timeout
                     if CFAbsoluteTimeGetCurrent() - startTime > maxSearchTime {
                         print("[BreakCalc] Timeout after \(simulationCount) simulations")
@@ -219,6 +225,7 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         var refinedResults = results
         if CFAbsoluteTimeGetCurrent() - startTime < maxSearchTime - refinementTime {
             for (strategy, result) in results {
+                if Task.isCancelled { break }
                 if result.result.holesOut {
                     let refined = refineResult(
                         initial: result,
@@ -524,6 +531,7 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         let fineSpeedSteps: [Float] = [-0.03, -0.015, 0, 0.015, 0.03]
 
         for angleOffset in fineAngleSteps {
+            if Task.isCancelled { break }
             for speedOffset in fineSpeedSteps {
                 let angle = initial.angle + angleOffset
                 let speed = initial.speed * (1 + speedOffset)

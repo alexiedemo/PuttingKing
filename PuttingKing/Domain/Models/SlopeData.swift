@@ -88,6 +88,8 @@ struct SlopeData {
                 for dz in -cellRadius...cellRadius {
                     let key = GridKey(x: centerX + dx, z: centerZ + dz)
                     if let cellIndices = cells[key] {
+                        // Bounds check for safety before returning indices
+                        // (Requires gradientField.count but we don't have it here, so we will return indices directly, but we must protect the caller)
                         indices.append(contentsOf: cellIndices)
                     }
                 }
@@ -145,6 +147,9 @@ struct SlopeData {
         let effectiveRadius = max(searchRadius, 0.1) // Ensure minimum query radius
 
         for index in candidateIndices {
+            // Safety bounds check
+            guard index >= 0 && index < gradientField.count else { continue }
+            
             let sample = gradientField[index]
             let samplePos2D = SIMD2<Float>(sample.position.x, sample.position.z)
             let dist = simd_distance(position2D, samplePos2D)
