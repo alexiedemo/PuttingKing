@@ -251,7 +251,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Slider(value: $settings.altitudeMeters, in: 0...3000, step: 50)
+                Slider(value: $settings.altitudeMeters, in: 0...5000, step: 100)
                     .accentColor(.cyan)
 
                 HStack {

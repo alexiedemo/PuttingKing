@@ -212,22 +212,25 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
     ) -> [SIMD3<Float>] {
         guard vertices.count > 0 else { return vertices }
 
-        // Build adjacency list
-        var neighbors: [[Int]] = Array(repeating: [], count: vertices.count)
+        // Build adjacency list using Sets for O(N log N) deduplication
+        // (Old approach used Array.contains() — O(N^2) total, causing freezes on large meshes)
+        var neighborSets: [Set<Int>] = Array(repeating: Set<Int>(), count: vertices.count)
 
         for i in stride(from: 0, to: triangles.count, by: 3) {
+            guard i + 2 < triangles.count else { continue }
             let i0 = Int(triangles[i])
             let i1 = Int(triangles[i + 1])
             let i2 = Int(triangles[i + 2])
+            guard i0 < vertices.count && i1 < vertices.count && i2 < vertices.count else { continue }
 
-            // Add bidirectional edges
-            if !neighbors[i0].contains(i1) { neighbors[i0].append(i1) }
-            if !neighbors[i0].contains(i2) { neighbors[i0].append(i2) }
-            if !neighbors[i1].contains(i0) { neighbors[i1].append(i0) }
-            if !neighbors[i1].contains(i2) { neighbors[i1].append(i2) }
-            if !neighbors[i2].contains(i0) { neighbors[i2].append(i0) }
-            if !neighbors[i2].contains(i1) { neighbors[i2].append(i1) }
+            // Sets handle duplication automatically in O(1) amortized
+            neighborSets[i0].insert(i1); neighborSets[i0].insert(i2)
+            neighborSets[i1].insert(i0); neighborSets[i1].insert(i2)
+            neighborSets[i2].insert(i0); neighborSets[i2].insert(i1)
         }
+
+        // Convert to arrays for indexed access during the smooth passes
+        let neighbors: [[Int]] = neighborSets.map { Array($0) }
 
         var current = vertices
 

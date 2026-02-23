@@ -255,9 +255,10 @@ final class LiDARScanningService: NSObject, ObservableObject {
             self?.currentMeshAnchors = anchors
             self?.vertexCount = newVertexCount
             self?.scanQualityValue = newQuality
+            // Send Combine events on main thread — PassthroughSubject/CurrentValueSubject
+            // are NOT thread-safe and must be driven from a single thread.
+            self?.scanQualitySubject.send(newQuality)
+            self?.meshUpdatesSubject.send(anchors)
         }
-
-        scanQualitySubject.send(newQuality)
-        meshUpdatesSubject.send(anchors)
     }
 }
