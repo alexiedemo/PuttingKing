@@ -12,6 +12,7 @@ struct ScanningContainerView: View {
     @State private var showPositionError = false
     @State private var analysisProgress: Double = 0
     @State private var analysisTimer: Timer?
+    @State private var isViewVisible: Bool = true  // Guards stale closures after dismissal
 
     init() {
         let container = DependencyContainer.shared
@@ -33,10 +34,12 @@ struct ScanningContainerView: View {
             ARViewContainer(viewModel: viewModel, arSessionManager: arSessionManager)
                 .ignoresSafeArea()
                 .onAppear {
+                    isViewVisible = true
                     viewModel.startNewScan()
                     startCrosshairAnimation()
                 }
                 .onDisappear {
+                    isViewVisible = false
                     // Clean up timer to prevent memory leaks
                     analysisTimer?.invalidate()
                     analysisTimer = nil
@@ -887,8 +890,9 @@ struct ScanningContainerView: View {
 
         // Auto-dismiss after 3 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            guard self.isViewVisible else { return }  // Guard against stale closure on dismissed view
             withAnimation(.easeInOut(duration: 0.3)) {
-                showPositionError = false
+                self.showPositionError = false
             }
         }
     }

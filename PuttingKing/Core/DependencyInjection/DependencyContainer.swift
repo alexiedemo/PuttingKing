@@ -52,47 +52,34 @@ final class DependencyContainer: @unchecked Sendable {
     }
 
     var pathSimulationService: PathSimulationServiceProtocol {
+        // Resolve dependency BEFORE acquiring lock to avoid lock inversion
+        // (slopeAnalysisService acquisition requires a lock too)
+        let slopeService = slopeAnalysisService
+        
         lock.lock()
         defer { lock.unlock() }
-
+        
         if let service = _pathSimulationService {
             return service
         }
-
-        // Note: We need to unlock before accessing slopeAnalysisService to avoid deadlock
-        lock.unlock()
-        let slopeService = slopeAnalysisService
-        lock.lock()
-
-        // Double-check after re-acquiring lock
-        if let service = _pathSimulationService {
-            return service
-        }
-
+        
         let service = PathSimulationService(slopeAnalysisService: slopeService)
         _pathSimulationService = service
         return service
     }
 
     var breakCalculationService: BreakCalculationServiceProtocol {
-        lock.lock()
-        defer { lock.unlock() }
-
-        if let service = _breakCalculationService {
-            return service
-        }
-
-        // Note: We need to unlock before accessing other services to avoid deadlock
-        lock.unlock()
+        // Resolve dependencies BEFORE acquiring lock to avoid lock inversion
         let pathService = pathSimulationService
         let slopeService = slopeAnalysisService
+        
         lock.lock()
-
-        // Double-check after re-acquiring lock
+        defer { lock.unlock() }
+        
         if let service = _breakCalculationService {
             return service
         }
-
+        
         let service = BreakCalculationService(
             pathSimulationService: pathService,
             slopeAnalysisService: slopeService

@@ -135,8 +135,11 @@ struct PhysicsParameters {
         // Stimpmeter releases ball at 1.83 m/s (from 20° ramp, 30" release point)
         let stimpmeterInitialVelocity: Float = 1.83
 
+        // Safety clamp: stimpmeter must be positive to avoid divide-by-zero
+        let clampedStimpmeter = max(stimpmeter, 1.0)
+
         // Convert stimpmeter feet to meters
-        let stimpmeterMeters = stimpmeter * 0.3048
+        let stimpmeterMeters = clampedStimpmeter * 0.3048
 
         // Derive friction coefficient mu from stimpmeter kinematic equation:
         // Ball decelerates at a = (5/7)*mu*g during pure rolling

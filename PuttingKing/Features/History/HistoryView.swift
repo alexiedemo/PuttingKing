@@ -301,9 +301,9 @@ struct HistoryView: View {
         case 0.8...:
             return .green
         case 0.6..<0.8:
-            return .orange
+            return .yellow  // Match DesignSystem.Colors.confidence definition
         default:
-            return .red
+            return .orange
         }
     }
 
