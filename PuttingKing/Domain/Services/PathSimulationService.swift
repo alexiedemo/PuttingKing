@@ -213,13 +213,12 @@ final class PathSimulationService: PathSimulationServiceProtocol {
             }
 
             // Friction force based on motion phase, adjusted for grain direction
+            // Ball travel direction in XZ plane for grain calculation (needed outside if-block)
+            let ballDir2D = SIMD2<Float>(velocity.x, velocity.z)
             var frictionForce = SIMD3<Float>.zero
             if speed > 0.001 {
                 let velocityDir = simd_normalize(velocity)
                 let frictionMagnitude: Float
-
-                // Ball travel direction in XZ plane for grain calculation
-                let ballDir2D = SIMD2<Float>(velocity.x, velocity.z)
                 let grainAdjustedFriction = parameters.frictionWithGrain(ballDirection: ballDir2D)
 
                 switch motionPhase {

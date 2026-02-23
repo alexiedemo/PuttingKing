@@ -112,8 +112,7 @@ struct HistoryView: View {
                 .foregroundColor(.gray)
 
             Text("No Saved Scans")
-                .font(.title2)
-                .fontWeight(.semibold)
+                .font(DesignSystem.Typography.title)
 
             Text("Your putting analysis history will appear here after you complete scans.")
                 .font(.body)
@@ -260,7 +259,7 @@ struct HistoryView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(scan.courseName ?? "Unknown Course")
-                    .font(.headline)
+                    .font(DesignSystem.Typography.headline)
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
@@ -288,12 +287,10 @@ struct HistoryView: View {
                     .foregroundColor(.secondary)
 
                 Text(scan.speedDescription)
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(speedColor(scan.recommendedSpeed).opacity(0.2))
-                    .foregroundColor(speedColor(scan.recommendedSpeed))
-                    .cornerRadius(4)
+                    .pillBadge(
+                        backgroundColor: speedColor(scan.recommendedSpeed),
+                        foregroundColor: speedColor(scan.recommendedSpeed)
+                    )
             }
         }
         .padding(.vertical, 8)

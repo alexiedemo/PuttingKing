@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9BD671A47DBE49A7DA912497 /* ScanningResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B936154C09E45EBDF69709B /* ScanningResultView.swift */; };
 		APP001 /* PuttingKingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC001 /* PuttingKingApp.swift */; };
 		APP002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC002 /* AppState.swift */; };
 		APP003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC003 /* ContentView.swift */; };
@@ -39,6 +40,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		4B936154C09E45EBDF69709B /* ScanningResultView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScanningResultView.swift; sourceTree = "<group>"; };
 		INFO_PLIST /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		PRODUCT /* PuttingKing.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PuttingKing.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		RES_ASSETS /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -83,6 +85,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		052E45228B189B853DF1C53C /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				4B936154C09E45EBDF69709B /* ScanningResultView.swift */,
+			);
+			name = Components;
+			sourceTree = "<group>";
+		};
 		APP_GROUP /* App */ = {
 			isa = PBXGroup;
 			children = (
@@ -263,6 +273,7 @@
 			isa = PBXGroup;
 			children = (
 				SRC019 /* ScanningContainerView.swift */,
+				052E45228B189B853DF1C53C /* Components */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -385,6 +396,7 @@
 				FT004 /* SettingsView.swift in Sources */,
 				FT005 /* OnboardingView.swift in Sources */,
 				FT006 /* HistoryView.swift in Sources */,
+				9BD671A47DBE49A7DA912497 /* ScanningResultView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -602,7 +614,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
 	};
 	rootObject = PROJECT /* Project object */;
 }

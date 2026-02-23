@@ -206,29 +206,3 @@ struct AppSettings: Codable, Equatable {
     }
 }
 
-/// Property wrapper for individual settings with type-safe persistence
-@propertyWrapper
-struct AppSetting<Value: Codable> {
-    private let key: String
-    private let defaultValue: Value
-
-    var wrappedValue: Value {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: key),
-                  let value = try? JSONDecoder().decode(Value.self, from: data) else {
-                return defaultValue
-            }
-            return value
-        }
-        set {
-            if let data = try? JSONEncoder().encode(newValue) {
-                UserDefaults.standard.set(data, forKey: key)
-            }
-        }
-    }
-
-    init(wrappedValue: Value, _ key: String) {
-        self.key = key
-        self.defaultValue = wrappedValue
-    }
-}

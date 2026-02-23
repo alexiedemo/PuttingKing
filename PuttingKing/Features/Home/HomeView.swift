@@ -161,7 +161,7 @@ struct HomeView: View {
             VStack(spacing: 8) {
                 Slider(value: $stimpmeterSpeed, in: 6...14, step: 0.5)
                     .accentColor(.green)
-                    .onChange(of: stimpmeterSpeed) { _, newValue in
+                    .onChange(of: stimpmeterSpeed) { newValue in
                         var settings = appState.settings
                         settings.stimpmeterSpeed = newValue
                         appState.settings = settings
@@ -184,15 +184,8 @@ struct HomeView: View {
             // Speed Description
             speedDescriptionBadge
         }
-        .padding(24)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial.opacity(0.5))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
-        )
+        .padding(DesignSystem.Spacing.lg)
+        .glassCard(cornerRadius: DesignSystem.CornerRadius.pill)
     }
 
     private func speedLabel(_ value: String, description: String) -> some View {
@@ -216,10 +209,7 @@ struct HomeView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.white.opacity(0.7))
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(color.opacity(0.15))
-        .cornerRadius(20)
+        .pillBadge(backgroundColor: color)
     }
 
     private var speedDescription: (String, Color) {
@@ -294,13 +284,10 @@ struct HomeView: View {
             Text(LiDARScanningService.isLiDARSupported ? "LiDAR Ready" : "LiDAR Not Available")
                 .font(.system(size: 13, weight: .medium))
         }
-        .foregroundColor(LiDARScanningService.isLiDARSupported ? .green : .orange)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(
-            (LiDARScanningService.isLiDARSupported ? Color.green : Color.orange).opacity(0.15)
+        .pillBadge(
+            backgroundColor: LiDARScanningService.isLiDARSupported ? .green : .orange,
+            foregroundColor: LiDARScanningService.isLiDARSupported ? .green : .orange
         )
-        .cornerRadius(20)
     }
 
     // MARK: - Bottom Navigation

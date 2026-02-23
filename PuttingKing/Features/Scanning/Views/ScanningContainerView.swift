@@ -60,8 +60,10 @@ struct ScanningContainerView: View {
                     .padding(.bottom, 16)
 
                 // Instruction banner
-                instructionBanner
-                    .padding(.bottom, 12)
+                if viewModel.scanState != .displayingResult {
+                    instructionBanner
+                        .padding(.bottom, 12)
+                }
 
                 // Bottom controls
                 bottomControls
@@ -87,10 +89,10 @@ struct ScanningContainerView: View {
             }
         }
         .statusBar(hidden: true)
-        .onChange(of: viewModel.scanState) { _, newState in
+        .onChange(of: viewModel.scanState) { newState in
             handleStateChange(newState)
         }
-        .onChange(of: scenePhase) { _, newPhase in
+        .onChange(of: scenePhase) { newPhase in
             switch newPhase {
             case .active:
                 // Resume session if we were previously running
@@ -596,7 +598,7 @@ struct ScanningContainerView: View {
 
         case .displayingResult:
             if let line = viewModel.puttingLine {
-                resultOverlay(line: line)
+                ScanningResultView(line: line, useMetricUnits: appState.settings.useMetricUnits)
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
 
@@ -646,104 +648,6 @@ struct ScanningContainerView: View {
         .padding(24)
         .background(.ultraThinMaterial.opacity(0.8))
         .cornerRadius(20)
-    }
-
-    private func resultOverlay(line: PuttingLine) -> some View {
-        VStack(spacing: 12) {
-            // Main stats
-            HStack(spacing: 0) {
-                // Distance
-                statItem(
-                    title: "DISTANCE",
-                    value: line.formattedDistance(useMetric: appState.settings.useMetricUnits),
-                    color: .white
-                )
-
-                verticalDivider
-
-                // Break
-                statItem(
-                    title: "BREAK",
-                    value: line.estimatedBreak.breakDescription,
-                    color: breakColor(line.estimatedBreak.breakDirection)
-                )
-
-                verticalDivider
-
-                // Speed
-                statItem(
-                    title: "SPEED",
-                    value: line.recommendedSpeed.description,
-                    color: speedColor(line.recommendedSpeed)
-                )
-            }
-            .padding(.vertical, 16)
-            .padding(.horizontal, 8)
-            .background(.ultraThinMaterial.opacity(0.9))
-            .cornerRadius(16)
-
-            // Confidence badge
-            HStack(spacing: 6) {
-                Image(systemName: confidenceIcon(line.confidence))
-                    .font(.system(size: 12))
-                Text("\(Int(line.confidence * 100))% confidence")
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .foregroundColor(confidenceColor(line.confidence))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(confidenceColor(line.confidence).opacity(0.15))
-            .cornerRadius(20)
-
-        }
-    }
-
-    private var verticalDivider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.2))
-            .frame(width: 1, height: 50)
-    }
-
-    private func statItem(title: String, value: String, color: Color) -> some View {
-        VStack(spacing: 6) {
-            Text(title)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(.white.opacity(0.6))
-                .tracking(1)
-
-            Text(value)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundColor(color)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func breakColor(_ direction: PuttingLine.BreakDirection) -> Color {
-        switch direction {
-        case .left: return .cyan
-        case .right: return .orange
-        case .straight: return .green
-        }
-    }
-
-    private func speedColor(_ speed: PuttingLine.PuttSpeed) -> Color {
-        switch speed {
-        case .gentle: return .cyan
-        case .moderate: return .green
-        case .firm: return .orange
-        }
-    }
-
-    private func confidenceIcon(_ confidence: Float) -> String {
-        if confidence >= 0.8 { return "checkmark.seal.fill" }
-        if confidence >= 0.6 { return "checkmark.circle.fill" }
-        return "exclamationmark.circle.fill"
-    }
-
-    private func confidenceColor(_ confidence: Float) -> Color {
-        if confidence >= 0.8 { return .green }
-        if confidence >= 0.6 { return .yellow }
-        return .orange
     }
 
     private var analyzingView: some View {
