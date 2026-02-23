@@ -245,6 +245,19 @@ final class ScanningViewModel: ObservableObject {
             return
         }
 
+        // Validate distance between ball and hole
+        let distance = ball.worldPosition.horizontalDistance(to: hole.worldPosition)
+        guard distance >= 0.3 else {
+            self.error = .unknown("Ball and hole are too close together. Please re-mark the ball position.")
+            scanState = .markingBall
+            return
+        }
+        guard distance <= 30.0 else {
+            self.error = .unknown("Ball is too far from hole. Please re-mark positions.")
+            scanState = .markingBall
+            return
+        }
+
         // Cancel any existing analysis task
         analysisTask?.cancel()
 
@@ -300,6 +313,8 @@ final class ScanningViewModel: ObservableObject {
             print("[ViewModel] Started new putt")
         } catch {
             print("[ViewModel] Failed to restart scanning: \(error)")
+            self.error = .lidarUnavailable
+            scanState = .error(.lidarUnavailable)
         }
     }
 
@@ -334,6 +349,10 @@ final class ScanningViewModel: ObservableObject {
 
     /// Redo hole marking
     func redoHole() {
+        // Cancel any running analysis task to prevent stale state updates
+        analysisTask?.cancel()
+        analysisTask = nil
+
         holePosition = nil
         currentSession?.holePosition = nil
 

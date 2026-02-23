@@ -957,8 +957,8 @@ extension ARSessionManager: ARSessionDelegate {
     func sessionInterruptionEnded(_ session: ARSession) {
         DispatchQueue.main.async {
             self.isSessionRunning = true
-            // Restart LiDAR scanning if it was stopped during interruption
-            try? self.lidarService.startScanning()
+            // Don't unconditionally restart LiDAR — the ViewModel controls scanning lifecycle.
+            // LiDAR will resume when the user takes the next scanning action.
         }
         print("[ARSession] Interruption ended - session resumed")
     }
