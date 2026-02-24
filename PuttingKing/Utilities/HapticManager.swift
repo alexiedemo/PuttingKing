@@ -199,8 +199,20 @@ final class HapticManager {
     }
 
     private func restartHapticEngine() {
-        engineQueue.async { [weak self] in
-            try? self?.hapticEngine?.start()
+        // Retry with exponential backoff — the engine often fails to restart
+        // immediately after an audio session interruption (error 2003329396).
+        // Delaying 0.5s then 1.5s gives the audio system time to recover.
+        let delays: [Double] = [0.5, 1.5, 3.0]
+        for (attempt, delay) in delays.enumerated() {
+            engineQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
+                do {
+                    try self?.hapticEngine?.start()
+                } catch {
+                    if attempt == delays.count - 1 {
+                        print("[HapticManager] Engine restart failed after \(delays.count) attempts: \(error)")
+                    }
+                }
+            }
         }
     }
 

@@ -118,15 +118,30 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         let angleSteps = 25 // Finer resolution for breaking putts (was 15)
 
         // Speed variations around each strategy's base speed
-        let speedVariations: [Float] = [0.95, 0.98, 1.0, 1.02, 1.05, 1.08]
+        // Try base speed first, then nearby variations (most promising first)
+        let speedVariations: [Float] = [1.0, 1.02, 0.98, 1.05, 0.95, 1.08]
 
         var simulationCount = 0
         var allSuccessfulPutts: [(result: SimulationResult, speed: Float, angle: Float, confidence: Float)] = []
 
-        // Grid search for all strategies
+        // Pre-compute angle offsets in center-outward spiral order.
+        // This ensures the most promising angles (near direct line) are tested first,
+        // so short putts on flat greens find solutions before the timeout.
+        let angleOffsets: [Float] = {
+            let step = 2 * maxAngleOffset / Float(angleSteps - 1)
+            var offsets: [Float] = [0] // Start at center (direct line)
+            for i in 1...(angleSteps / 2) {
+                let offset = step * Float(i)
+                offsets.append(offset)    // right
+                offsets.append(-offset)   // left
+            }
+            return offsets
+        }()
+
+        // Grid search for all strategies — try optimal first for best chance of early success
         let strategySpeeds: [(PuttingStrategy, Float)] = [
-            (.conservative, conservativeSpeed),
             (.optimal, optimalSpeed),
+            (.conservative, conservativeSpeed),
             (.aggressive, aggressiveSpeed)
         ]
 
@@ -136,7 +151,7 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
             speedLoop: for speedMult in speedVariations {
                 let speed = baseSpeed * speedMult
 
-                for angleStep in 0..<angleSteps {
+                for angleOffset in angleOffsets {
                     // Check cancellation
                     if Task.isCancelled {
                         print("[BreakCalc] Task cancelled, exiting grid search early")
@@ -149,7 +164,6 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
                         break speedLoop
                     }
 
-                    let angleOffset = -maxAngleOffset + (Float(angleStep) / Float(angleSteps - 1)) * 2 * maxAngleOffset
                     let rotatedDirection = rotateDirectionHorizontal(directDirection, by: angleOffset)
 
                     let result = pathSimulationService.simulatePutt(

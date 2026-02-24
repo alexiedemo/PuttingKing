@@ -40,7 +40,11 @@ struct ScanningContainerView: View {
                 .ignoresSafeArea()
                 .onAppear {
                     isViewVisible = true
-                    viewModel.startNewScan()
+                    // Dispatch to avoid "Publishing changes from within view updates" warning
+                    // when startNewScan() mutates @Published state during the initial layout pass
+                    DispatchQueue.main.async {
+                        viewModel.startNewScan()
+                    }
                     startCrosshairAnimation()
                 }
                 .onDisappear {
@@ -898,7 +902,7 @@ struct ScanningContainerView: View {
         ) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 viewModel.markHole(at: position)
-                arSessionManager.placeHoleMarker(at: position)
+                // Marker placement handled by ARViewContainer on state change
             }
         } else {
             showPositionErrorFeedback()
@@ -915,7 +919,7 @@ struct ScanningContainerView: View {
         ) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 viewModel.markBall(at: position)
-                arSessionManager.placeBallMarker(at: position)
+                // Marker placement handled by ARViewContainer on state change
             }
         } else {
             showPositionErrorFeedback()
