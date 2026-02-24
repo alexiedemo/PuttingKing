@@ -272,7 +272,7 @@ final class ScanningViewModel: ObservableObject {
         isAnalyzing = true
         currentSession?.state = .analyzing
 
-        print("[ViewModel] Starting analysis with \(lidarService.currentMeshAnchors.count) anchors")
+        print("[ViewModel] Starting analysis with \(vertexCount) vertices")
 
         analysisTask = Task { [weak self] in
             guard let self else { return }
@@ -430,6 +430,12 @@ final class ScanningViewModel: ObservableObject {
     // MARK: - Private Methods
 
     private func analyzeAndCalculateLine(ball: BallPosition, hole: HolePosition) async {
+        // Always release simulation cache when analysis finishes, regardless of
+        // success, failure, or cancellation. The cache holds ~400KB of spatial hash
+        // data that is only needed during break calculation.
+        defer {
+            (breakService as? BreakCalculationService)?.clearSimulationCache()
+        }
         do {
             // Step 1: Extract mesh anchors then immediately release raw LiDAR data.
             // ARMeshAnchor objects hold large geometry buffers (10-20MB+).
@@ -530,10 +536,6 @@ final class ScanningViewModel: ObservableObject {
                     self.saveScan()
                 }
             }
-
-            // Release the simulation cache — it's no longer needed after
-            // break calculation and holds ~400KB of spatial hash data.
-            (breakService as? BreakCalculationService)?.clearSimulationCache()
 
         } catch let scanError as ScanError {
             guard !Task.isCancelled else { return }

@@ -10,7 +10,10 @@ final class LiDARScanningService: NSObject, ObservableObject {
     static let shared = LiDARScanningService()
 
     // Published state for SwiftUI observation (always updated on main thread)
-    @Published private(set) var currentMeshAnchors: [ARMeshAnchor] = []
+    // NOTE: currentMeshAnchors intentionally NOT @Published — publishing a large
+    // [ARMeshAnchor] array 10-30x/sec was duplicating 30-120MB of geometry buffers
+    // into main-thread closures, Combine subscribers, and SwiftUI observation.
+    // Use getCurrentMeshAnchors() for thread-safe access instead.
     @Published private(set) var scanQualityValue: Float = 0.0
     @Published private(set) var isScanning = false
     @Published private(set) var vertexCount: Int = 0
@@ -24,11 +27,6 @@ final class LiDARScanningService: NSObject, ObservableObject {
     private weak var arSession: ARSession?
 
     // Combine publishers for external subscribers
-    private let meshUpdatesSubject = PassthroughSubject<[ARMeshAnchor], Never>()
-    var meshUpdates: AnyPublisher<[ARMeshAnchor], Never> {
-        meshUpdatesSubject.eraseToAnyPublisher()
-    }
-
     private let scanQualitySubject = CurrentValueSubject<Float, Never>(0.0)
     var scanQuality: AnyPublisher<Float, Never> {
         scanQualitySubject.eraseToAnyPublisher()
@@ -64,9 +62,8 @@ final class LiDARScanningService: NSObject, ObservableObject {
         _internalIsScanning = true
         meshAnchorsLock.unlock()
 
-        // Update published properties on main thread (M10 fix: also send Combine events on main)
+        // Update published scalar metrics on main thread
         DispatchQueue.main.async { [weak self] in
-            self?.currentMeshAnchors = []
             self?.vertexCount = 0
             self?.scanQualityValue = 0
             self?.isScanning = true
@@ -92,9 +89,8 @@ final class LiDARScanningService: NSObject, ObservableObject {
         _internalIsScanning = true
         meshAnchorsLock.unlock()
 
-        // Update published properties on main thread (M10 fix: also send Combine events on main)
+        // Update published scalar metrics on main thread
         DispatchQueue.main.async { [weak self] in
-            self?.currentMeshAnchors = []
             self?.vertexCount = 0
             self?.scanQualityValue = 0
             self?.isScanning = true
@@ -142,11 +138,10 @@ final class LiDARScanningService: NSObject, ObservableObject {
         meshAnchorsLock.unlock()
 
         DispatchQueue.main.async { [weak self] in
-            self?.currentMeshAnchors = []
             self?.vertexCount = 0
             self?.scanQualityValue = 0
             self?.isScanning = false
-            self?.scanQualitySubject.send(0) // M10 fix: send on main thread
+            self?.scanQualitySubject.send(0)
         }
     }
 
@@ -164,19 +159,16 @@ final class LiDARScanningService: NSObject, ObservableObject {
         // Enable scene reconstruction with mesh
         config.sceneReconstruction = .meshWithClassification
 
-        // Enable scene depth for additional accuracy
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
-            config.frameSemantics.insert(.sceneDepth)
-        }
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.smoothedSceneDepth) {
-            config.frameSemantics.insert(.smoothedSceneDepth)
-        }
+        // NOTE: sceneDepth / smoothedSceneDepth intentionally NOT enabled.
+        // They allocate ~1MB depth buffers per frame but the app never reads
+        // ARFrame.sceneDepth — mesh reconstruction works without them.
 
         // Enable plane detection for ground reference
         config.planeDetection = [.horizontal]
 
-        // Environment texturing for visual quality
-        config.environmentTexturing = .automatic
+        // Environment texturing disabled — saves 20-50MB of cubemap probe textures.
+        // App uses only SimpleMaterial with solid colors; no reflections needed.
+        config.environmentTexturing = .none
 
         return config
     }
@@ -262,19 +254,18 @@ final class LiDARScanningService: NSObject, ObservableObject {
         updateMetricsOnMainThread(with: updatedAnchors)
     }
 
-    /// Update published properties on main thread for SwiftUI observation
+    /// Update published scalar metrics on main thread for SwiftUI observation.
+    /// Only publishes lightweight scalars (vertex count, quality float) — never
+    /// the full [ARMeshAnchor] array, which would duplicate 30-120MB of geometry
+    /// buffers into the main-thread closure on every anchor update (10-30x/sec).
     private func updateMetricsOnMainThread(with anchors: [ARMeshAnchor]) {
         let newVertexCount = anchors.reduce(0) { $0 + $1.geometry.vertices.count }
         let newQuality = calculateScanQuality(from: anchors)
 
         DispatchQueue.main.async { [weak self] in
-            self?.currentMeshAnchors = anchors
             self?.vertexCount = newVertexCount
             self?.scanQualityValue = newQuality
-            // Send Combine events on main thread — PassthroughSubject/CurrentValueSubject
-            // are NOT thread-safe and must be driven from a single thread.
             self?.scanQualitySubject.send(newQuality)
-            self?.meshUpdatesSubject.send(anchors)
         }
     }
 }

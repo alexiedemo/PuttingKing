@@ -442,8 +442,11 @@ final class PathSimulationService: PathSimulationServiceProtocol {
                 )
             }
 
-            // Record path point every 5 steps for smoother visualization near hole (L2 fix)
-            if stepCount % 5 == 0 {
+            // Record path point every 5 steps, capped at 300 points to bound memory.
+            // 300 points × 32 bytes = ~10KB per simulation — safe even with 450 simulations.
+            // Dynamically increase step interval once cap is approached.
+            let recordInterval = path.count < 250 ? 5 : 20
+            if stepCount % recordInterval == 0 && path.count < 300 {
                 path.append(PuttingLine.PathPoint(
                     position: position,
                     velocity: velocity,

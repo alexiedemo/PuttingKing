@@ -52,7 +52,7 @@ final class ARSessionManager: NSObject, ObservableObject {
     private static func makeConfiguration() -> ARWorldTrackingConfiguration {
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = [.horizontal]
-        config.environmentTexturing = .automatic
+        config.environmentTexturing = .none // Saves 20-50MB — app uses only SimpleMaterial, no reflections
 
         // Enable full scene reconstruction with classification, fallback to mesh-only
         if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
@@ -61,13 +61,10 @@ final class ARSessionManager: NSObject, ObservableObject {
             config.sceneReconstruction = .mesh
         }
 
-        // Enable scene depth for additional accuracy
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
-            config.frameSemantics.insert(.sceneDepth)
-        }
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.smoothedSceneDepth) {
-            config.frameSemantics.insert(.smoothedSceneDepth)
-        }
+        // NOTE: sceneDepth / smoothedSceneDepth intentionally NOT enabled.
+        // They allocate ~1MB depth buffers per frame (60fps) but the app never reads
+        // ARFrame.sceneDepth — mesh reconstruction uses the depth sensor internally
+        // regardless of these frame semantics. Removing them saves significant memory churn.
 
         return config
     }
