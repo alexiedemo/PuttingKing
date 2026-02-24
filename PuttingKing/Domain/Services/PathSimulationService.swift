@@ -59,56 +59,132 @@ protocol PathSimulationServiceProtocol {
     ) -> SimulationResult
 }
 
-/// Pre-binned spatial grid for fast surface height lookups.
-/// Replaces O(n) brute-force vertex search with O(~k) where k ≈ vertices-per-cell.
-private struct SurfaceHeightCache {
-    private let cellSize: Float = 0.15  // ~15cm cells
+/// Triangle-based spatial hash for exact surface height lookups via barycentric interpolation.
+/// Finds the containing mesh triangle in XZ projection and interpolates the exact Y coordinate.
+/// Falls back to IDW vertex interpolation at mesh edges where no triangle contains the query point.
+private struct TriangleSurfaceCache {
     private let invCellSize: Float
-    private var grid: [UInt64: [Int]] = [:]  // packed cell key → vertex indices
+    private var triangleGrid: [UInt64: [Int]] = [:]  // cell key → triangle indices
+    private let triVerts: [(v0: SIMD3<Float>, v1: SIMD3<Float>, v2: SIMD3<Float>)]
+
+    // Fallback: vertex grid for points outside triangle coverage
+    private var vertexGrid: [UInt64: [Int]] = [:]
     private let vertices: [SIMD3<Float>]
 
-    init(vertices: [SIMD3<Float>]) {
+    init(vertices: [SIMD3<Float>], triangles: [UInt32]) {
         self.vertices = vertices
         self.invCellSize = 1.0 / 0.15
-        grid.reserveCapacity(vertices.count / 4)
+
+        // Build triangle data and spatial hash
+        var tris: [(v0: SIMD3<Float>, v1: SIMD3<Float>, v2: SIMD3<Float>)] = []
+        tris.reserveCapacity(triangles.count / 3)
+
+        for i in stride(from: 0, to: triangles.count - 2, by: 3) {
+            let i0 = Int(triangles[i])
+            let i1 = Int(triangles[i + 1])
+            let i2 = Int(triangles[i + 2])
+            guard i0 < vertices.count, i1 < vertices.count, i2 < vertices.count else { continue }
+
+            let v0 = vertices[i0], v1 = vertices[i1], v2 = vertices[i2]
+            let triIdx = tris.count
+            tris.append((v0, v1, v2))
+
+            // Insert into all cells the triangle's XZ bounding box overlaps
+            let minX = Int32(floor(min(v0.x, min(v1.x, v2.x)) * invCellSize))
+            let maxX = Int32(floor(max(v0.x, max(v1.x, v2.x)) * invCellSize))
+            let minZ = Int32(floor(min(v0.z, min(v1.z, v2.z)) * invCellSize))
+            let maxZ = Int32(floor(max(v0.z, max(v1.z, v2.z)) * invCellSize))
+
+            for cx in minX...maxX {
+                for cz in minZ...maxZ {
+                    let key = UInt64(bitPattern: Int64(cx)) &<< 32 | UInt64(UInt32(bitPattern: cz))
+                    triangleGrid[key, default: []].append(triIdx)
+                }
+            }
+        }
+        self.triVerts = tris
+
+        // Build vertex grid for fallback
+        vertexGrid.reserveCapacity(vertices.count / 4)
         for (i, v) in vertices.enumerated() {
-            let key = Self.cellKey(x: v.x, z: v.z, inv: invCellSize)
-            grid[key, default: []].append(i)
+            let cx = Int32(floor(v.x * invCellSize))
+            let cz = Int32(floor(v.z * invCellSize))
+            let key = UInt64(bitPattern: Int64(cx)) &<< 32 | UInt64(UInt32(bitPattern: cz))
+            vertexGrid[key, default: []].append(i)
         }
     }
 
-    private static func cellKey(x: Float, z: Float, inv: Float) -> UInt64 {
-        let cx = Int32(floor(x * inv))
-        let cz = Int32(floor(z * inv))
-        return UInt64(bitPattern: Int64(cx)) &<< 32 | UInt64(UInt32(bitPattern: cz))
-    }
-
-    /// Fast height lookup — searches only nearby grid cells
+    /// Project point onto mesh surface. Tries barycentric first, falls back to IDW.
     func projectHeight(at position: SIMD3<Float>, fallbackY: Float) -> Float {
         let cx = Int32(floor(position.x * invCellSize))
         let cz = Int32(floor(position.z * invCellSize))
-        let searchRadius: Float = 0.5
-        let searchRadiusSq = searchRadius * searchRadius
+
+        // Search current cell + neighbors for containing triangle
+        for dx: Int32 in -1...1 {
+            for dz: Int32 in -1...1 {
+                let key = UInt64(bitPattern: Int64(cx + dx)) &<< 32 | UInt64(UInt32(bitPattern: cz + dz))
+                guard let triIndices = triangleGrid[key] else { continue }
+                for ti in triIndices {
+                    let tri = triVerts[ti]
+                    if let h = barycentricHeight(px: position.x, pz: position.z,
+                                                  v0: tri.v0, v1: tri.v1, v2: tri.v2) {
+                        return h
+                    }
+                }
+            }
+        }
+
+        // Fallback: IDW vertex interpolation for edge regions
+        return idwFallback(at: position, fallbackY: fallbackY)
+    }
+
+    /// Barycentric interpolation in XZ plane; returns interpolated Y if point is inside triangle
+    private func barycentricHeight(px: Float, pz: Float,
+                                    v0: SIMD3<Float>, v1: SIMD3<Float>, v2: SIMD3<Float>) -> Float? {
+        let d0x = v1.x - v0.x, d0z = v1.z - v0.z
+        let d1x = v2.x - v0.x, d1z = v2.z - v0.z
+        let d2x = px - v0.x,   d2z = pz - v0.z
+
+        let dot00 = d0x * d0x + d0z * d0z
+        let dot01 = d0x * d1x + d0z * d1z
+        let dot02 = d0x * d2x + d0z * d2z
+        let dot11 = d1x * d1x + d1z * d1z
+        let dot12 = d1x * d2x + d1z * d2z
+
+        let denom = dot00 * dot11 - dot01 * dot01
+        guard abs(denom) > 1e-8 else { return nil }
+
+        let invDenom = 1.0 / denom
+        let u = (dot11 * dot02 - dot01 * dot12) * invDenom
+        let v = (dot00 * dot12 - dot01 * dot02) * invDenom
+
+        let eps: Float = -0.001  // Small tolerance for edge cases
+        guard u >= eps, v >= eps, (u + v) <= (1.0 - eps) else { return nil }
+
+        return v0.y + u * (v1.y - v0.y) + v * (v2.y - v0.y)
+    }
+
+    /// IDW vertex fallback for points outside triangle coverage
+    private func idwFallback(at position: SIMD3<Float>, fallbackY: Float) -> Float {
+        let cx = Int32(floor(position.x * invCellSize))
+        let cz = Int32(floor(position.z * invCellSize))
+        let searchRadiusSq: Float = 0.25  // 0.5m radius squared
 
         var totalWeight: Float = 0
         var weightedY: Float = 0
 
-        // Search 7×7 cells (±3) to fully cover 0.5m radius with 0.15m cells
-        // (±3 cells = ±0.45m from cell center, plus half-cell = 0.525m coverage)
         for dx: Int32 in -3...3 {
             for dz: Int32 in -3...3 {
-                let keyCx = cx + dx
-                let keyCz = cz + dz
-                let key = UInt64(bitPattern: Int64(keyCx)) &<< 32 | UInt64(UInt32(bitPattern: keyCz))
-                guard let indices = grid[key] else { continue }
+                let key = UInt64(bitPattern: Int64(cx + dx)) &<< 32 | UInt64(UInt32(bitPattern: cz + dz))
+                guard let indices = vertexGrid[key] else { continue }
                 for i in indices {
-                    let vertex = vertices[i]
-                    let ddx = position.x - vertex.x
-                    let ddz = position.z - vertex.z
+                    let v = vertices[i]
+                    let ddx = position.x - v.x
+                    let ddz = position.z - v.z
                     let distSq = ddx * ddx + ddz * ddz
                     if distSq < searchRadiusSq {
                         let weight = 1.0 / max(sqrt(distSq), 0.01)
-                        weightedY += vertex.y * weight
+                        weightedY += v.y * weight
                         totalWeight += weight
                     }
                 }
@@ -160,8 +236,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         let dt = parameters.timeStep
         let g = parameters.gravity
 
-        // Build spatial cache once — O(n) construction, then O(1) lookups per timestep
-        let heightCache = SurfaceHeightCache(vertices: surface.vertices)
+        // Build triangle-based spatial cache — barycentric interpolation for exact surface heights
+        let heightCache = TriangleSurfaceCache(vertices: surface.vertices, triangles: surface.triangles)
 
         // Record starting point
         path.append(PuttingLine.PathPoint(
@@ -416,7 +492,7 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         dt: Float,
         parameters: PhysicsParameters,
         motionPhase: BallMotionPhase,
-        heightCache: SurfaceHeightCache
+        heightCache: TriangleSurfaceCache
     ) -> (position: SIMD3<Float>, velocity: SIMD3<Float>) {
         // k1: derivatives at current state
         let k1v = acceleration * dt

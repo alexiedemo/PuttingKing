@@ -166,7 +166,9 @@ struct SlopeData {
 
             if dist < effectiveRadius {
                 foundSamples = true
-                let weight = 1.0 / max(dist, 0.001)
+                // Quadratic inverse-distance: 1/(d² + ε) strongly favors nearby samples,
+                // reducing gradient smearing from distant vertices
+                let weight = 1.0 / (dist * dist + 0.0001)
                 totalWeight += weight
                 weightedGradient += sample.gradient * weight
             }

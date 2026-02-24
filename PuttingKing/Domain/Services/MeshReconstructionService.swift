@@ -96,12 +96,16 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
             throw ScanError.meshReconstructionFailed
         }
 
-        // Step 2: Apply smoothing
+        // Step 2: Apply smoothing — 3 iterations with increased Y-axis smoothing.
+        // LiDAR depth noise (1-2cm) is comparable to real slope signals (1-3cm/m).
+        // Real slopes are spatially correlated across many vertices; noise is random,
+        // so additional smoothing averages out noise while preserving true contours.
         let smoothedVertices = laplacianSmooth(
             vertices: allVertices,
             triangles: allTriangles,
-            iterations: 2,
-            lambda: 0.3
+            iterations: 3,
+            lambda: 0.3,
+            yFactor: 0.5
         )
 
         // Step 3: Recalculate normals after smoothing
@@ -236,7 +240,8 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
         vertices: [SIMD3<Float>],
         triangles: [UInt32],
         iterations: Int,
-        lambda: Float
+        lambda: Float,
+        yFactor: Float = 0.5
     ) -> [SIMD3<Float>] {
         guard vertices.count > 0 else { return vertices }
 
@@ -279,7 +284,7 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
                 let delta = centroid - current[i]
                 smoothed[i] = current[i] + SIMD3<Float>(
                     lambda * delta.x,
-                    lambda * 0.3 * delta.y,  // 30% Y smoothing to preserve contours
+                    lambda * yFactor * delta.y,  // Parameterized Y smoothing (0.5 = 50%)
                     lambda * delta.z
                 )
             }

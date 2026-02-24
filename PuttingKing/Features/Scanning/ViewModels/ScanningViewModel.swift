@@ -59,10 +59,11 @@ final class ScanningViewModel: ObservableObject {
     }
 
     /// Whether the mark ball button should be enabled
-    /// Must have sufficient scan data matching `hasMinimumData` requirements
-    /// Lowered to 15% / 500 vertices based on user feedback (Phase 5)
+    /// Requires sufficient vertex density for reliable slope analysis.
+    /// At 1500 vertices over a typical putt area, vertex spacing is ~7cm,
+    /// which gives enough mesh resolution for meaningful gradient computation.
     var canMarkBall: Bool {
-        scanState.canMarkBall && scanProgress >= 0.15 && vertexCount >= 500
+        scanState.canMarkBall && scanProgress >= 0.25 && vertexCount >= 1500
     }
 
     /// Convenience initializer using DI container

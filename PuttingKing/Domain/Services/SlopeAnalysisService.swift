@@ -74,6 +74,12 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
             )
         }
 
+        // Post-processing: reject outlier gradients and spatially smooth the field.
+        // Even after mesh smoothing, per-vertex normals carry noise from the ~3-6
+        // adjacent triangles. Spatial averaging acts as a topology-independent filter.
+        gradientSamples = rejectGradientOutliers(gradientSamples, medianRadius: 0.25, threshold: 3.0)
+        gradientSamples = smoothGradientField(gradientSamples, radius: 0.15)
+
         // Calculate statistics (var so indoor floor detection can zero them)
         var maxSlope = gradientSamples.map(\.slopePercentage).max() ?? 0
         var avgSlope = gradientSamples.map(\.slopePercentage).reduce(0, +) / Float(gradientSamples.count)
@@ -184,5 +190,127 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
         } else {
             return .right
         }
+    }
+
+    // MARK: - Gradient Field Post-Processing
+
+    /// Reject gradient outliers whose magnitude exceeds threshold × local median
+    private func rejectGradientOutliers(
+        _ samples: [SlopeData.GradientSample],
+        medianRadius: Float,
+        threshold: Float
+    ) -> [SlopeData.GradientSample] {
+        guard samples.count > 3 else { return samples }
+
+        // Build spatial grid for neighbor lookup
+        let cellSize: Float = 0.15
+        let invCell = 1.0 / cellSize
+        var grid: [UInt64: [Int]] = [:]
+        grid.reserveCapacity(samples.count / 4)
+
+        for (i, s) in samples.enumerated() {
+            let cx = Int32(floor(s.position.x * invCell))
+            let cz = Int32(floor(s.position.z * invCell))
+            let key = UInt64(bitPattern: Int64(cx)) &<< 32 | UInt64(UInt32(bitPattern: cz))
+            grid[key, default: []].append(i)
+        }
+
+        var result = samples
+        let cellRadius = Int(ceil(medianRadius / cellSize))
+
+        for i in 0..<samples.count {
+            let s = samples[i]
+            let cx = Int32(floor(s.position.x * invCell))
+            let cz = Int32(floor(s.position.z * invCell))
+
+            // Gather neighbor magnitudes within radius
+            var magnitudes: [Float] = []
+            for dx in Int32(-cellRadius)...Int32(cellRadius) {
+                for dz in Int32(-cellRadius)...Int32(cellRadius) {
+                    let key = UInt64(bitPattern: Int64(cx + dx)) &<< 32 | UInt64(UInt32(bitPattern: cz + dz))
+                    guard let indices = grid[key] else { continue }
+                    for j in indices {
+                        let dx2 = s.position.x - samples[j].position.x
+                        let dz2 = s.position.z - samples[j].position.z
+                        if dx2 * dx2 + dz2 * dz2 < medianRadius * medianRadius {
+                            magnitudes.append(simd_length(samples[j].gradient))
+                        }
+                    }
+                }
+            }
+
+            guard magnitudes.count >= 3 else { continue }
+            magnitudes.sort()
+            let median = magnitudes[magnitudes.count / 2]
+
+            let myMag = simd_length(s.gradient)
+            if myMag > threshold * max(median, 0.001) {
+                // Clamp to median magnitude, preserving direction
+                let dir = myMag > 0.0001 ? s.gradient / myMag : .zero
+                result[i].gradient = dir * median
+                result[i].slopePercentage = median * 100
+                result[i].slopeAngle = atan(median)
+            }
+        }
+        return result
+    }
+
+    /// Smooth gradient field by replacing each sample with IDW average of neighbors
+    private func smoothGradientField(
+        _ samples: [SlopeData.GradientSample],
+        radius: Float
+    ) -> [SlopeData.GradientSample] {
+        guard samples.count > 1 else { return samples }
+
+        // Build spatial grid
+        let cellSize: Float = 0.15
+        let invCell = 1.0 / cellSize
+        var grid: [UInt64: [Int]] = [:]
+        grid.reserveCapacity(samples.count / 4)
+
+        for (i, s) in samples.enumerated() {
+            let cx = Int32(floor(s.position.x * invCell))
+            let cz = Int32(floor(s.position.z * invCell))
+            let key = UInt64(bitPattern: Int64(cx)) &<< 32 | UInt64(UInt32(bitPattern: cz))
+            grid[key, default: []].append(i)
+        }
+
+        var result = samples
+        let cellRadius = Int(ceil(radius / cellSize))
+
+        for i in 0..<samples.count {
+            let s = samples[i]
+            let cx = Int32(floor(s.position.x * invCell))
+            let cz = Int32(floor(s.position.z * invCell))
+
+            var totalWeight: Float = 0
+            var weightedGradient = SIMD2<Float>.zero
+
+            for dx in Int32(-cellRadius)...Int32(cellRadius) {
+                for dz in Int32(-cellRadius)...Int32(cellRadius) {
+                    let key = UInt64(bitPattern: Int64(cx + dx)) &<< 32 | UInt64(UInt32(bitPattern: cz + dz))
+                    guard let indices = grid[key] else { continue }
+                    for j in indices {
+                        let dx2 = s.position.x - samples[j].position.x
+                        let dz2 = s.position.z - samples[j].position.z
+                        let distSq = dx2 * dx2 + dz2 * dz2
+                        if distSq < radius * radius {
+                            let weight = 1.0 / max(sqrt(distSq), 0.005)
+                            totalWeight += weight
+                            weightedGradient += samples[j].gradient * weight
+                        }
+                    }
+                }
+            }
+
+            if totalWeight > 0 {
+                let smoothed = weightedGradient / totalWeight
+                let mag = simd_length(smoothed)
+                result[i].gradient = smoothed
+                result[i].slopePercentage = mag * 100
+                result[i].slopeAngle = atan(mag)
+            }
+        }
+        return result
     }
 }
