@@ -483,21 +483,17 @@ final class ScanningViewModel: ObservableObject {
                 altitudeMeters: settings.altitudeMeters
             )
 
-            // Run break calculation off main thread — simulatePutt() is synchronous
-            // and runs 40-150 times per analysis; keeping it on @MainActor blocks the
-            // UI for seconds, triggering "System gesture gate timed out."
-            let capturedBreakService = breakService
-            let line = await Task.detached(priority: .userInitiated) {
-                await capturedBreakService.findOptimalPutt(
-                    from: ball,
-                    to: hole,
-                    on: filteredSurface,
-                    with: slopeData,
-                    parameters: parameters
-                )
-            }.value
-
-            if let line {
+            // Break calculation runs on @MainActor but yields every 10 sims.
+            // With the TriangleSurfaceCache (built once, reused across all sims),
+            // total analysis time dropped from ~4s to ~0.3s, so main thread
+            // blocking between yields is ~50-100ms — well within gesture tolerance.
+            if let line = await breakService.findOptimalPutt(
+                from: ball,
+                to: hole,
+                on: filteredSurface,
+                with: slopeData,
+                parameters: parameters
+            ) {
                 // Check cancellation before updating state — timeout may have fired
                 guard !Task.isCancelled else { return }
 
