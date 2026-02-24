@@ -210,6 +210,12 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         self.slopeAnalysisService = slopeAnalysisService
     }
 
+    /// Release cached height data to free memory after analysis completes
+    func clearHeightCache() {
+        cachedSurfaceId = nil
+        cachedHeightCache = nil
+    }
+
     /// Simulate a putt with given initial conditions using research-based physics
     func simulatePutt(
         from ball: BallPosition,

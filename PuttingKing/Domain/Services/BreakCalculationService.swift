@@ -636,6 +636,11 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         )
     }
 
+    /// Release cached simulation data to free memory after analysis completes
+    func clearSimulationCache() {
+        (pathSimulationService as? PathSimulationService)?.clearHeightCache()
+    }
+
     private func categorizeSpeed(_ speed: Float, baseSpeed: Float) -> PuttingLine.PuttSpeed {
         let ratio = speed / baseSpeed
         if ratio < 0.95 {

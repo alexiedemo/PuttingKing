@@ -430,36 +430,44 @@ final class ScanningViewModel: ObservableObject {
     // MARK: - Private Methods
 
     private func analyzeAndCalculateLine(ball: BallPosition, hole: HolePosition) async {
-        let meshAnchors = lidarService.getCurrentMeshAnchors()
-
-        guard !meshAnchors.isEmpty else {
-            self.error = .insufficientData
-            self.scanState = .error(.insufficientData)
-            self.isAnalyzing = false
-            return
-        }
-
         do {
-            print("[ViewModel] Reconstructing surface from \(meshAnchors.count) anchors")
+            // Step 1: Extract mesh anchors then immediately release raw LiDAR data.
+            // ARMeshAnchor objects hold large geometry buffers (10-20MB+).
+            // Inner scope ensures meshAnchors + unfiltered surface are freed early.
+            let filteredSurface: GreenSurface
+            do {
+                let meshAnchors = lidarService.getCurrentMeshAnchors()
 
-            // Step 1: Reconstruct surface from mesh data
-            let surface = try await meshService.reconstructSurface(from: meshAnchors)
+                guard !meshAnchors.isEmpty else {
+                    self.error = .insufficientData
+                    self.scanState = .error(.insufficientData)
+                    self.isAnalyzing = false
+                    return
+                }
 
-            // Check cancellation after each expensive async step to respect timeout
-            guard !Task.isCancelled else { return }
+                print("[ViewModel] Reconstructing surface from \(meshAnchors.count) anchors")
 
-            print("[ViewModel] Surface reconstructed: \(surface.vertexCount) vertices")
+                let surface = try await meshService.reconstructSurface(from: meshAnchors)
 
-            // Step 2: Filter to relevant area (between ball and hole + buffer)
-            // Run off main thread since this is pure computation on large meshes
-            let center = (ball.worldPosition + hole.worldPosition) / 2
-            let distance = ball.worldPosition.horizontalDistance(to: hole.worldPosition)
-            let radius = distance / 2 + 1.0 // 1m buffer
+                // Clear the LiDAR service's stored anchor copies — we've extracted
+                // everything we need into GreenSurface. This frees 10-20MB+ of
+                // ARMeshAnchor geometry buffers.
+                lidarService.reset()
 
-            let capturedMeshService = meshService
-            let filteredSurface = await Task.detached(priority: .userInitiated) {
-                capturedMeshService.filterGreenMesh(from: surface, around: center, radius: radius)
-            }.value
+                guard !Task.isCancelled else { return }
+                print("[ViewModel] Surface reconstructed: \(surface.vertexCount) vertices")
+
+                // Step 2: Filter to relevant area (between ball and hole + buffer)
+                let center = (ball.worldPosition + hole.worldPosition) / 2
+                let distance = ball.worldPosition.horizontalDistance(to: hole.worldPosition)
+                let radius = distance / 2 + 1.0 // 1m buffer
+
+                let capturedMeshService = meshService
+                filteredSurface = await Task.detached(priority: .userInitiated) {
+                    capturedMeshService.filterGreenMesh(from: surface, around: center, radius: radius)
+                }.value
+                // meshAnchors + unfiltered surface go out of scope here
+            }
 
             print("[ViewModel] Filtered surface: \(filteredSurface.vertexCount) vertices")
 
@@ -522,6 +530,11 @@ final class ScanningViewModel: ObservableObject {
                     self.saveScan()
                 }
             }
+
+            // Release the simulation cache — it's no longer needed after
+            // break calculation and holds ~400KB of spatial hash data.
+            (breakService as? BreakCalculationService)?.clearSimulationCache()
+
         } catch let scanError as ScanError {
             guard !Task.isCancelled else { return }
             self.error = scanError
