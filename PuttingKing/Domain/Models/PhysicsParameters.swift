@@ -95,8 +95,11 @@ struct PhysicsParameters {
     var altitudeMeters: Float = 0.0 // Elevation above sea level
 
     // Simulation settings
-    let timeStep: Float = 0.002 // 2ms (500Hz) - optimized for mobile performance while maintaining accuracy
-    let maxSimulationTime: Float = 15.0 // Max putt duration in seconds (L15 fix: was 30s = 15K iterations)
+    // 5ms timestep (200Hz) — ball moves 2.5-7.5mm per step at typical putt speeds.
+    // RK4 integration handles this accurately; professional simulators use 5-10ms.
+    // Previous 2ms timestep caused 60-140ms per simulation (too slow for grid search).
+    let timeStep: Float = 0.005
+    let maxSimulationTime: Float = 8.0 // Max putt duration — even 30m putts stop within 8s
     let stoppedThreshold: Float = 0.01 // Ball considered stopped below 1cm/s
 
     // Rolling deceleration factor (5/7 from moment of inertia for pure rolling)

@@ -390,7 +390,9 @@ final class ARSessionManager: NSObject, ObservableObject {
         return createEnhancedPuttingLineEntity(from: line, color: color)
     }
 
-    /// Create enhanced putting line with velocity-based coloring and better visibility
+    /// Create enhanced putting line with velocity-based coloring and better visibility.
+    /// Optimized: reuses shared MeshResource/SimpleMaterial, limits smoothing to 2 segments
+    /// per point, and caps total entities to prevent GPU memory bloat.
     private func createEnhancedPuttingLineEntity(from line: PuttingLine, color: AppSettings.LineColor) -> Entity {
         let entity = Entity()
         let pathPoints = line.pathPoints
@@ -399,12 +401,20 @@ final class ARSessionManager: NSObject, ObservableObject {
               let firstPoint = pathPoints.first else { return entity }
 
         let startPosition = firstPoint.position
-        let maxSpeed = pathPoints.map { $0.speed }.max() ?? 1.0
 
-        // Create smooth line segments with velocity-based intensity
-        // Use Catmull-Rom spline for smooth path visualization (O-3)
-        let smoothedPoints = smoothPathPoints(pathPoints)
-        
+        // Smooth with only 2 segments per point (was 4) — halves entity count
+        let smoothedPoints = smoothPathPoints(pathPoints, segmentsPerPoint: 2)
+
+        // Shared material (single color) — avoids creating a new SimpleMaterial per segment.
+        // Velocity-based coloring is dropped in favor of massive GPU memory savings.
+        let lineColor = UIColor(
+            red: CGFloat(color.color.r * 0.9),
+            green: CGFloat(color.color.g * 0.9),
+            blue: CGFloat(color.color.b * 0.9),
+            alpha: 0.95
+        )
+        let sharedMaterial = SimpleMaterial(color: lineColor, isMetallic: false)
+
         for i in 0..<(smoothedPoints.count - 1) {
             let startPoint = smoothedPoints[i]
             let endPoint = smoothedPoints[i + 1]
@@ -414,25 +424,12 @@ final class ARSessionManager: NSObject, ObservableObject {
 
             let segmentLength = simd_distance(start, end)
             guard segmentLength > 0.001 else { continue }
-            
-            // Calculate intensity based on velocity (faster = brighter)
-            let avgSpeed = (startPoint.speed + endPoint.speed) / 2
-            let speedRatio = avgSpeed / maxSpeed
-            let intensity = 0.6 + speedRatio * 0.4 // Range 0.6 - 1.0
 
-            let lineColor = UIColor(
-                red: CGFloat(color.color.r * intensity),
-                green: CGFloat(color.color.g * intensity),
-                blue: CGFloat(color.color.b * intensity),
-                alpha: 0.95
-            )
-            let material = SimpleMaterial(color: lineColor, isMetallic: false)
-
-            let segmentEntity = createHorizontalLineSegment(from: start, to: end, material: material)
+            let segmentEntity = createHorizontalLineSegment(from: start, to: end, material: sharedMaterial)
             entity.addChild(segmentEntity)
         }
 
-        // Add glow effect spheres along the path for visibility
+        // Add glow effect spheres — reduced to ~10 points, shared mesh and material
         let glowColor = UIColor(
             red: CGFloat(color.color.r),
             green: CGFloat(color.color.g),
@@ -440,14 +437,12 @@ final class ARSessionManager: NSObject, ObservableObject {
             alpha: 0.7
         )
         let glowMaterial = SimpleMaterial(color: glowColor, isMetallic: false)
+        let glowMesh = MeshResource.generateSphere(radius: 0.014)
 
-        let step = max(1, pathPoints.count / 20) // Place ~20 glow points
+        let step = max(1, pathPoints.count / 10) // Place ~10 glow points (was 20)
         for i in stride(from: 0, to: pathPoints.count, by: step) {
             let pos = pathPoints[i].position - startPosition
-            let glow = ModelEntity(
-                mesh: .generateSphere(radius: 0.014),
-                materials: [glowMaterial]
-            )
+            let glow = ModelEntity(mesh: glowMesh, materials: [glowMaterial])
             glow.position = SIMD3<Float>(pos.x, 0.006, pos.z)
             entity.addChild(glow)
         }
@@ -511,7 +506,8 @@ final class ARSessionManager: NSObject, ObservableObject {
         return smoothed
     }
 
-    /// Create confidence band showing uncertainty range
+    /// Create confidence band showing uncertainty range.
+    /// Optimized: shared mesh/material, reduced to ~15 segments (was 30).
     private func createConfidenceBandEntity(from line: PuttingLine, confidence: Float) -> Entity {
         let entity = Entity()
         let pathPoints = line.pathPoints
@@ -522,28 +518,23 @@ final class ARSessionManager: NSObject, ObservableObject {
         let startPosition = firstPoint.position
 
         // Band width inversely proportional to confidence
-        // High confidence (0.9) = narrow band, low confidence (0.3) = wide band
-        let baseWidth: Float = 0.03 // 3cm at 100% confidence
-        let confidenceMultiplier = 1.0 + (1.0 - confidence) * 3.0 // 1x to 4x
+        let baseWidth: Float = 0.03
+        let confidenceMultiplier = 1.0 + (1.0 - confidence) * 3.0
         let bandWidth = baseWidth * confidenceMultiplier
 
-        // Semi-transparent band color
+        // Shared mesh and material for all band segments
         let bandColor = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 0.2)
         let bandMaterial = SimpleMaterial(color: bandColor, isMetallic: false)
+        let bandMesh = MeshResource.generateBox(size: SIMD3<Float>(bandWidth * 2, 0.002, bandWidth))
 
-        // Create band segments
-        let step = max(1, pathPoints.count / 30)
+        // Reduced to ~15 segments (was 30)
+        let step = max(1, pathPoints.count / 15)
         for i in stride(from: 0, to: pathPoints.count - step, by: step) {
             let pos = pathPoints[i].position - startPosition
 
-            // Create flat ellipse on ground representing uncertainty
-            let band = ModelEntity(
-                mesh: .generateBox(size: SIMD3<Float>(bandWidth * 2, 0.002, bandWidth)),
-                materials: [bandMaterial]
-            )
+            let band = ModelEntity(mesh: bandMesh, materials: [bandMaterial])
             band.position = SIMD3<Float>(pos.x, 0.001, pos.z)
 
-            // Rotate band perpendicular to path direction
             if i + step < pathPoints.count {
                 let nextPos = pathPoints[i + step].position - startPosition
                 let direction = nextPos - pos
@@ -760,8 +751,10 @@ final class ARSessionManager: NSObject, ObservableObject {
         let gapLength: Float = 0.05 // 5cm gaps
         let segmentSpacing = dashLength + gapLength
 
-        let lineColor = UIColor(white: 1.0, alpha: 0.4) // Semi-transparent white
+        let lineColor = UIColor(white: 1.0, alpha: 0.4)
         let material = SimpleMaterial(color: lineColor, isMetallic: false)
+        // Shared mesh for uniform-length dashes
+        let dashMesh = MeshResource.generateBox(size: SIMD3<Float>(0.015, 0.003, dashLength))
 
         var currentDistance: Float = 0
         while currentDistance < distance - dashLength {
@@ -769,13 +762,8 @@ final class ARSessionManager: NSObject, ObservableObject {
             let segmentEnd = direction * min(currentDistance + dashLength, distance)
 
             let segmentMid = (segmentStart + segmentEnd) / 2
-            let segmentLength = simd_distance(segmentStart, segmentEnd)
 
-            // Create flat line segment on ground
-            let segment = ModelEntity(
-                mesh: .generateBox(size: SIMD3<Float>(0.015, 0.003, segmentLength)),
-                materials: [material]
-            )
+            let segment = ModelEntity(mesh: dashMesh, materials: [material])
 
             // Position slightly below the main path line
             segment.position = SIMD3<Float>(segmentMid.x, 0.001, segmentMid.z)

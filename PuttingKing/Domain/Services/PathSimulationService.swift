@@ -226,13 +226,6 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         holePosition: HolePosition,
         parameters: PhysicsParameters
     ) -> SimulationResult {
-        let simStart = CFAbsoluteTimeGetCurrent()
-        defer {
-            let elapsed = (CFAbsoluteTimeGetCurrent() - simStart) * 1000
-            if elapsed > 10 { // Only log slow simulations (>10ms)
-                print("[PathSim] Simulation took \(String(format: "%.1f", elapsed))ms")
-            }
-        }
         // Initial state — guard against zero-direction NaN (L3 fix)
         var position = ball.worldPosition
         let dirLen = simd_length(direction)
@@ -256,16 +249,13 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         let g = parameters.gravity
 
         // Reuse or build triangle spatial cache — avoids O(N) rebuild on every simulation
-        let cacheStart = CFAbsoluteTimeGetCurrent()
         let heightCache: TriangleSurfaceCache
         if surface.id == cachedSurfaceId, let cached = cachedHeightCache {
             heightCache = cached
-            print("[PathSim] Cache HIT (surface \(surface.id.uuidString.prefix(8)))")
         } else {
             heightCache = TriangleSurfaceCache(vertices: surface.vertices, triangles: surface.triangles)
             cachedSurfaceId = surface.id
             cachedHeightCache = heightCache
-            print("[PathSim] Cache MISS — built from \(surface.vertices.count) verts in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - cacheStart) * 1000))ms (surface \(surface.id.uuidString.prefix(8)))")
         }
 
         // Record starting point
@@ -452,11 +442,11 @@ final class PathSimulationService: PathSimulationServiceProtocol {
                 )
             }
 
-            // Record path point every 5 steps, capped at 300 points to bound memory.
-            // 300 points × 32 bytes = ~10KB per simulation — safe even with 450 simulations.
-            // Dynamically increase step interval once cap is approached.
-            let recordInterval = path.count < 250 ? 5 : 20
-            if stepCount % recordInterval == 0 && path.count < 300 {
+            // Record path point every 2 steps (10ms intervals at 5ms timestep), capped at 200.
+            // With the larger timestep, fewer total steps occur, so record more frequently
+            // to maintain smooth visualization. 200 points × 32 bytes = ~6KB per sim.
+            let recordInterval = path.count < 180 ? 2 : 8
+            if stepCount % recordInterval == 0 && path.count < 200 {
                 path.append(PuttingLine.PathPoint(
                     position: position,
                     velocity: velocity,
