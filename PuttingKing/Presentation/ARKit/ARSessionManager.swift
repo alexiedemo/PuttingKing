@@ -4,6 +4,7 @@ import RealityKit
 import Combine
 
 /// Manages AR session lifecycle and content
+@MainActor
 final class ARSessionManager: NSObject, ObservableObject {
     private(set) var arView: ARView?
 
@@ -47,22 +48,13 @@ final class ARSessionManager: NSObject, ObservableObject {
         print("[ARSession] Configured")
     }
 
-    /// Start AR session (without starting LiDAR scanning - that happens when hole is marked)
-    func startSession() throws {
-        guard let arView = arView else { return }
-
-        guard LiDARScanningService.isLiDARSupported else {
-            throw ScanError.lidarUnavailable
-        }
-
-        // Run AR session with full LiDAR configuration
-        // Mesh anchors will be generated immediately but LiDARScanningService
-        // won't collect them until isScanning = true (when hole is marked)
+    /// Shared AR configuration factory — single source of truth (fixes H1 duplication)
+    private static func makeConfiguration() -> ARWorldTrackingConfiguration {
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = [.horizontal]
         config.environmentTexturing = .automatic
 
-        // Enable full scene reconstruction with classification
+        // Enable full scene reconstruction with classification, fallback to mesh-only
         if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
             config.sceneReconstruction = .meshWithClassification
         } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
@@ -77,11 +69,19 @@ final class ARSessionManager: NSObject, ObservableObject {
             config.frameSemantics.insert(.smoothedSceneDepth)
         }
 
-        arView.session.run(config)
+        return config
+    }
 
-        DispatchQueue.main.async {
-            self.isSessionRunning = true
+    /// Start AR session (without starting LiDAR scanning - that happens when hole is marked)
+    func startSession() throws {
+        guard let arView = arView else { return }
+
+        guard LiDARScanningService.isLiDARSupported else {
+            throw ScanError.lidarUnavailable
         }
+
+        arView.session.run(Self.makeConfiguration())
+        isSessionRunning = true
 
         // Show mesh visualization
         arView.debugOptions.insert(.showSceneUnderstanding)
@@ -92,9 +92,8 @@ final class ARSessionManager: NSObject, ObservableObject {
     /// Stop AR session
     func stopSession() {
         lidarService.stopScanning()
-        DispatchQueue.main.async {
-            self.isSessionRunning = false
-        }
+        arView?.session.pause()
+        isSessionRunning = false
         clearAllAnchors()
         print("[ARSession] Stopped")
     }
@@ -102,35 +101,18 @@ final class ARSessionManager: NSObject, ObservableObject {
     /// Reset AR session to recalibrate tracking
     func resetSession() {
         guard let arView = arView else { return }
-        
+
         // Pause current session
         arView.session.pause()
-        
+
         // Reset anchors and tracking
         clearAllAnchors()
         lidarService.reset()
-        
-        // Restart with new configuration
-        let configuration = ARWorldTrackingConfiguration()
-        configuration.planeDetection = [.horizontal]
-        configuration.environmentTexturing = .automatic
-        
-        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
-            configuration.sceneReconstruction = .meshWithClassification
-        } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
-            configuration.sceneReconstruction = .mesh
-        }
 
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
-            configuration.frameSemantics.insert(.sceneDepth)
-        }
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.smoothedSceneDepth) {
-            configuration.frameSemantics.insert(.smoothedSceneDepth)
-        }
+        // Run with reset options using shared config factory
+        arView.session.run(Self.makeConfiguration(), options: [.resetTracking, .removeExistingAnchors])
+        isSessionRunning = true
 
-        // Run with reset options
-        arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
-        
         print("[ARSession] Reset for recalibration")
     }
 
@@ -142,25 +124,9 @@ final class ARSessionManager: NSObject, ObservableObject {
     /// Resume AR session
     func resumeSession() {
         guard let arView = arView else { return }
-
-        let config = ARWorldTrackingConfiguration()
-        config.planeDetection = [.horizontal]
-        config.environmentTexturing = .automatic
-
-        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
-            config.sceneReconstruction = .meshWithClassification
-        } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
-            config.sceneReconstruction = .mesh
-        }
-
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
-            config.frameSemantics.insert(.sceneDepth)
-        }
-        if ARWorldTrackingConfiguration.supportsFrameSemantics(.smoothedSceneDepth) {
-            config.frameSemantics.insert(.smoothedSceneDepth)
-        }
-
-        arView.session.run(config)
+        arView.session.run(Self.makeConfiguration())
+        isSessionRunning = true
+        print("[ARSession] Resumed")
     }
 
     // MARK: - Position Marking
@@ -399,22 +365,22 @@ final class ARSessionManager: NSObject, ObservableObject {
 
     // MARK: - Private Helpers
 
-    /// Create ring entity
+    /// Create ring entity — M13 fix: reduced from 32 to 16 segments per ring
+    /// to halve ModelEntity count. Rings are small; 16 segments is visually sufficient.
+    /// Also reuse mesh/material across segments to reduce GPU resource allocations.
     private func createRingEntity(radius: Float, color: UIColor) -> ModelEntity {
-        // Create torus-like ring using multiple small boxes
         let entity = ModelEntity()
-        let segments = 32
-        let tubeRadius: Float = 0.003
+        let segments = 16
+        let tubeRadius: Float = 0.004 // Slightly larger to compensate for fewer segments
+        let material = SimpleMaterial(color: color, isMetallic: false)
+        let segmentMesh = MeshResource.generateSphere(radius: tubeRadius)
 
         for i in 0..<segments {
             let angle = Float(i) / Float(segments) * .pi * 2
             let x = cos(angle) * radius
             let z = sin(angle) * radius
 
-            let segment = ModelEntity(
-                mesh: .generateSphere(radius: tubeRadius),
-                materials: [SimpleMaterial(color: color, isMetallic: false)]
-            )
+            let segment = ModelEntity(mesh: segmentMesh, materials: [material])
             segment.position = SIMD3<Float>(x, tubeRadius, z)
             entity.addChild(segment)
         }
@@ -493,19 +459,28 @@ final class ARSessionManager: NSObject, ObservableObject {
     }
 
     /// Smooth path using Catmull-Rom spline interpolation (Phase 2 Optimization)
+    /// L7 fix: lowered guard from 4 to 3 — for exactly 3 points, duplicate the
+    /// first/last to create phantom control points so Catmull-Rom can still interpolate.
     private func smoothPathPoints(_ points: [PuttingLine.PathPoint], segmentsPerPoint: Int = 4) -> [PuttingLine.PathPoint] {
-        guard points.count >= 4 else { return points }
+        guard points.count >= 3 else { return points }
+
+        // Pad to 4+ points by duplicating endpoints for Catmull-Rom phantom control points
+        var padded = points
+        if padded.count == 3 {
+            padded.insert(padded[0], at: 0)
+            padded.append(padded[padded.count - 1])
+        }
         
         var smoothed: [PuttingLine.PathPoint] = []
-        
+
         // Add first point
-        smoothed.append(points[0])
-        
-        for i in 0..<(points.count - 3) {
-            let p0 = points[i]
-            let p1 = points[i + 1]
-            let p2 = points[i + 2]
-            let p3 = points[i + 3]
+        smoothed.append(padded[0])
+
+        for i in 0..<(padded.count - 3) {
+            let p0 = padded[i]
+            let p1 = padded[i + 1]
+            let p2 = padded[i + 2]
+            let p3 = padded[i + 3]
             
             for t in 1...segmentsPerPoint {
                 let tVal = Float(t) / Float(segmentsPerPoint)
@@ -531,9 +506,9 @@ final class ARSessionManager: NSObject, ObservableObject {
             }
         }
         
-        // Add final point (points[count-2] already included as last interpolated point at tVal=1.0)
-        if points.count > 3 {
-             smoothed.append(points[points.count - 1])
+        // Add final point
+        if padded.count > 3 {
+             smoothed.append(padded[padded.count - 1])
         }
         
         return smoothed
@@ -924,29 +899,30 @@ final class ARSessionManager: NSObject, ObservableObject {
 
 // MARK: - ARSessionDelegate
 extension ARSessionManager: ARSessionDelegate {
-    func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
-        // Forward to LiDAR service
+    nonisolated func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
+        // Forward to LiDAR service (thread-safe internally)
         lidarService.handleAnchorsAdded(anchors)
     }
 
-    func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
-        // Forward to LiDAR service
+    nonisolated func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
+        // Forward to LiDAR service (thread-safe internally)
         lidarService.handleAnchorsUpdated(anchors)
     }
 
-    func session(_ session: ARSession, didRemove anchors: [ARAnchor]) {
-        // Forward to LiDAR service
+    nonisolated func session(_ session: ARSession, didRemove anchors: [ARAnchor]) {
+        // Forward to LiDAR service (thread-safe internally)
         lidarService.handleAnchorsRemoved(anchors)
     }
 
-    func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {
-        DispatchQueue.main.async {
-            self.trackingState = camera.trackingState
+    nonisolated func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {
+        let state = camera.trackingState
+        Task { @MainActor in
+            self.trackingState = state
         }
     }
 
-    func sessionWasInterrupted(_ session: ARSession) {
-        DispatchQueue.main.async {
+    nonisolated func sessionWasInterrupted(_ session: ARSession) {
+        Task { @MainActor in
             self.isSessionRunning = false
             // Pause LiDAR scanning during interruption to prevent data corruption
             self.lidarService.stopScanning()
@@ -954,8 +930,8 @@ extension ARSessionManager: ARSessionDelegate {
         print("[ARSession] Session was interrupted")
     }
 
-    func sessionInterruptionEnded(_ session: ARSession) {
-        DispatchQueue.main.async {
+    nonisolated func sessionInterruptionEnded(_ session: ARSession) {
+        Task { @MainActor in
             self.isSessionRunning = true
             // Don't unconditionally restart LiDAR — the ViewModel controls scanning lifecycle.
             // LiDAR will resume when the user takes the next scanning action.
@@ -963,9 +939,9 @@ extension ARSessionManager: ARSessionDelegate {
         print("[ARSession] Interruption ended - session resumed")
     }
 
-    func session(_ session: ARSession, didFailWithError error: Error) {
+    nonisolated func session(_ session: ARSession, didFailWithError error: Error) {
         print("[ARSession] Session failed with error: \(error.localizedDescription)")
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.isSessionRunning = false
             self.trackingState = .notAvailable
         }

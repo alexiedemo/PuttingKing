@@ -273,16 +273,19 @@ final class ScanningViewModel: ObservableObject {
 
         print("[ViewModel] Starting analysis with \(lidarService.currentMeshAnchors.count) anchors")
 
-        analysisTask = Task {
+        analysisTask = Task { [weak self] in
+            guard let self else { return }
             // Timeout protection: 15 seconds max
             await withTaskGroup(of: Void.self) { group in
                 group.addTask {
                     await self.analyzeAndCalculateLine(ball: ball, hole: hole)
                 }
-                group.addTask { @MainActor in
+                group.addTask { @MainActor [weak self] in
                     try? await Task.sleep(nanoseconds: 15_000_000_000)
                     guard !Task.isCancelled else { return }
-                    if self.isAnalyzing {
+                    guard let self else { return }
+                    // Only set error if analysis hasn't already completed (race guard)
+                    if self.isAnalyzing && self.scanState == .analyzing {
                         self.error = .unknown("Analysis timed out. Try scanning again.")
                         self.scanState = .error(.unknown("Analysis timed out. Try scanning again."))
                         self.isAnalyzing = false
@@ -344,12 +347,9 @@ final class ScanningViewModel: ObservableObject {
         print("[ViewModel] Cancelled scan")
     }
 
-    deinit {
-        // Clean up subscriptions and tasks
-        analysisTask?.cancel()
-        cancellables.forEach { $0.cancel() }
-        cancellables.removeAll()
-    }
+    // Note: deinit removed — AnyCancellable auto-cancels on dealloc,
+    // and analysisTask is cancelled in cancel(). Manual deinit was a
+    // data race: deinit is nonisolated but these properties are @MainActor.
 
     /// Resume LiDAR data collection if we're in a scanning state.
     /// Called after app returns from background to restore the scanning pipeline.

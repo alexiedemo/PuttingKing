@@ -115,10 +115,18 @@ extension ARMeshGeometry {
         let pointer = classificationBuffer.buffer.contents()
         let bytesPerElement = classificationBuffer.stride
 
+        // L8 fix: handle different classification buffer element sizes
         for i in 0..<count {
             let offset = i * bytesPerElement
-            let rawValue = pointer.load(fromByteOffset: offset, as: UInt8.self)
-            result.append(ARMeshClassification(rawValue: Int(rawValue)) ?? .none)
+            let rawValue: Int
+            if bytesPerElement >= 4 {
+                rawValue = Int(pointer.load(fromByteOffset: offset, as: UInt32.self))
+            } else if bytesPerElement >= 2 {
+                rawValue = Int(pointer.load(fromByteOffset: offset, as: UInt16.self))
+            } else {
+                rawValue = Int(pointer.load(fromByteOffset: offset, as: UInt8.self))
+            }
+            result.append(ARMeshClassification(rawValue: rawValue) ?? .none)
         }
 
         return result

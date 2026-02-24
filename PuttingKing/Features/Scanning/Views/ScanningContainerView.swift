@@ -12,9 +12,13 @@ struct ScanningContainerView: View {
     @State private var showPositionError = false
     @State private var validationErrorMessage: String?
     @State private var analysisProgress: Double = 0
-    @State private var analysisTimer: Timer?
+    @State private var analysisTimerTask: Task<Void, Never>?
     @State private var isViewVisible: Bool = true  // Guards stale closures after dismissal
 
+    // Note: Settings are loaded from AppState in the init via AppSettings.load().
+    // This is a snapshot — for a scanning session, stable settings are actually
+    // desirable (we don't want physics to change mid-scan). AppState.settings
+    // is kept in sync for next session start.
     init() {
         let container = DependencyContainer.shared
         let settings = AppSettings.load()
@@ -41,9 +45,9 @@ struct ScanningContainerView: View {
                 }
                 .onDisappear {
                     isViewVisible = false
-                    // Clean up timer to prevent memory leaks
-                    analysisTimer?.invalidate()
-                    analysisTimer = nil
+                    // Clean up async task to prevent memory leaks
+                    analysisTimerTask?.cancel()
+                    analysisTimerTask = nil
                 }
 
             // Crosshair overlay
@@ -144,37 +148,25 @@ struct ScanningContainerView: View {
             return
         }
 
+        // M17 fix: use centralized HapticManager (pre-prepared generators) instead of
+        // creating inline UIFeedbackGenerators that aren't .prepare()-d
         switch newState {
         case .scanningGreen:
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
+            HapticManager.shared.scanningStarted()
         case .markingBall:
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
+            HapticManager.shared.mediumImpact()
         case .analyzing:
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
+            HapticManager.shared.analysisStarted()
             startAnalysisProgress()
         case .displayingResult:
             // Provide confidence-based feedback
             if let line = viewModel.puttingLine {
-                if line.confidence >= 0.8 {
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
-                } else if line.confidence >= 0.6 {
-                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                    generator.impactOccurred()
-                } else {
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.warning)
-                }
+                HapticManager.shared.confidenceFeedback(confidence: line.confidence)
             } else {
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
+                HapticManager.shared.success()
             }
         case .error:
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.error)
+            HapticManager.shared.error()
         default:
             break
         }
@@ -184,21 +176,24 @@ struct ScanningContainerView: View {
 
     private func startAnalysisProgress() {
         analysisProgress = 0
-        // Invalidate existing timer to prevent multiple timers
-        analysisTimer?.invalidate()
-        // Timer closure for SwiftUI struct - state binding handles updates
-        analysisTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            withAnimation(.linear(duration: 0.1)) {
-                // Simulate progress (asymptotic approach to 95%)
-                analysisProgress += (0.95 - analysisProgress) * 0.08
+        // Cancel existing task to prevent multiples
+        analysisTimerTask?.cancel()
+        // Use structured concurrency instead of Timer (SwiftUI-safe @State mutation)
+        analysisTimerTask = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+                guard !Task.isCancelled else { break }
+                withAnimation(.linear(duration: 0.1)) {
+                    analysisProgress += (0.95 - analysisProgress) * 0.08
+                }
             }
         }
     }
 
     private func stopAnalysisProgress() {
-        guard analysisTimer != nil else { return }
-        analysisTimer?.invalidate()
-        analysisTimer = nil
+        guard analysisTimerTask != nil else { return }
+        analysisTimerTask?.cancel()
+        analysisTimerTask = nil
         withAnimation(.easeOut(duration: 0.3)) {
             analysisProgress = 1.0
         }
@@ -369,8 +364,7 @@ struct ScanningContainerView: View {
 
     private func showValidationError(_ message: String) {
         if appState.settings.hapticFeedbackEnabled {
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.error)
+            HapticManager.shared.error()
         }
 
         withAnimation(.easeInOut(duration: 0.3)) {
@@ -400,10 +394,7 @@ struct ScanningContainerView: View {
                 // Recovery action button for limited tracking
                 if case .limited = arSessionManager.trackingState {
                     Button(action: {
-                        // Haptic feedback
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
-                        
+                        HapticManager.shared.mediumImpact()
                         // Reset AR session to recalibrate
                         arSessionManager.resetSession()
                     }) {
@@ -502,7 +493,7 @@ struct ScanningContainerView: View {
             HStack(spacing: 6) {
                 // Quality dots
                 HStack(spacing: 3) {
-                    ForEach(0..<4) { index in
+                    ForEach(0..<4, id: \.self) { index in
                         Circle()
                             .fill(qualityDotColor(index: index))
                             .frame(width: 8, height: 8)
@@ -732,7 +723,7 @@ struct ScanningContainerView: View {
                     .rotationEffect(.degrees(-90))
 
                 // Animated rings behind
-                ForEach(0..<3) { index in
+                ForEach(0..<3, id: \.self) { index in
                     Circle()
                         .stroke(Color.green.opacity(0.2), lineWidth: 1)
                         .frame(width: CGFloat(90 + index * 15), height: CGFloat(90 + index * 15))
@@ -899,8 +890,7 @@ struct ScanningContainerView: View {
 
     private func markHoleAction() {
         if appState.settings.hapticFeedbackEnabled {
-            let impact = UIImpactFeedbackGenerator(style: .medium)
-            impact.impactOccurred()
+            HapticManager.shared.holeMarked()
         }
 
         if let position = arSessionManager.getWorldPosition(
@@ -917,8 +907,7 @@ struct ScanningContainerView: View {
 
     private func markBallAction() {
         if appState.settings.hapticFeedbackEnabled {
-            let impact = UIImpactFeedbackGenerator(style: .medium)
-            impact.impactOccurred()
+            HapticManager.shared.ballMarked()
         }
 
         if let position = arSessionManager.getWorldPosition(
@@ -935,8 +924,7 @@ struct ScanningContainerView: View {
 
     private func showPositionErrorFeedback() {
         if appState.settings.hapticFeedbackEnabled {
-            let errorGenerator = UINotificationFeedbackGenerator()
-            errorGenerator.notificationOccurred(.warning)
+            HapticManager.shared.warning()
         }
 
         withAnimation(.easeInOut(duration: 0.3)) {

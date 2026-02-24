@@ -173,9 +173,11 @@ struct HomeView: View {
                         settings.stimpmeterSpeed = newValue
                         appState.settings = settings
 
-                        // Haptic feedback
-                        let impact = UIImpactFeedbackGenerator(style: .light)
-                        impact.impactOccurred()
+                        // L12 fix: use centralized HapticManager (pre-prepared generator)
+                        // and respect the haptic enabled setting
+                        if appState.settings.hapticFeedbackEnabled {
+                            HapticManager.shared.selectionChanged()
+                        }
                     }
 
                 // Speed Labels
@@ -238,9 +240,8 @@ struct HomeView: View {
             guard !isStarting else { return }
             isStarting = true
             
-            let impact = UIImpactFeedbackGenerator(style: .medium)
-            impact.impactOccurred()
-            
+            HapticManager.shared.mediumImpact()
+
             // Brief loading state for smoother transition
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 appState.currentScreen = .scanning

@@ -96,7 +96,7 @@ struct PhysicsParameters {
 
     // Simulation settings
     let timeStep: Float = 0.002 // 2ms (500Hz) - optimized for mobile performance while maintaining accuracy
-    let maxSimulationTime: Float = 30.0 // Max putt duration in seconds
+    let maxSimulationTime: Float = 15.0 // Max putt duration in seconds (L15 fix: was 30s = 15K iterations)
     let stoppedThreshold: Float = 0.01 // Ball considered stopped below 1cm/s
 
     // Rolling deceleration factor (5/7 from moment of inertia for pure rolling)
@@ -241,9 +241,11 @@ struct PhysicsParameters {
     }
 
     /// Calculate lateral deflection force from grain (cross-grain push)
-    /// Returns a force direction in the XZ plane that pushes ball toward grain direction
-    /// Deflection is strongest when ball rolls perpendicular to grain, zero when parallel
-    /// The slower the ball moves, the more grain affects its direction
+    /// Returns a force direction in the XZ plane perpendicular to ball travel.
+    /// Deflection is strongest when ball rolls perpendicular to grain, zero when parallel.
+    /// The force pushes the ball sideways in the direction the grain "wants" it to go —
+    /// i.e., the component of the grain vector perpendicular to the ball's travel direction.
+    /// The slower the ball moves, the more grain affects its direction.
     func grainDeflectionAcceleration(ballSpeed: Float, ballDirection: SIMD2<Float>) -> SIMD2<Float> {
         guard grassType.grainDeflectionFactor > 0.001 else { return .zero }
         guard ballSpeed > stoppedThreshold else { return .zero }
@@ -263,10 +265,17 @@ struct PhysicsParameters {
         // Grain deflection is stronger at lower speeds (ball has less momentum)
         let speedFactor = min(1.0, 0.5 / max(ballSpeed, 0.1))
 
-        // Deflection pushes ball toward grain direction, scaled by cross-grain component
+        // Project grain direction perpendicular to ball travel direction.
+        // This gives the lateral push direction the grain applies to the ball.
+        let alongBall = simd_dot(grainDir, ballDirNorm)
+        let perpComponent = grainDir - ballDirNorm * alongBall
+        let perpLen = simd_length(perpComponent)
+        guard perpLen > 0.001 else { return .zero }
+        let perpDir = perpComponent / perpLen
+
         let magnitude = grassType.grainDeflectionFactor * gravity * speedFactor * crossGrainFactor
 
-        return grainDir * magnitude
+        return perpDir * magnitude
     }
 
     /// Check if ball can be captured at given entry speed and offset

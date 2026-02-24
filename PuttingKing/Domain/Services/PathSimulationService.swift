@@ -138,9 +138,11 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         holePosition: HolePosition,
         parameters: PhysicsParameters
     ) -> SimulationResult {
-        // Initial state
+        // Initial state — guard against zero-direction NaN (L3 fix)
         var position = ball.worldPosition
-        var velocity = simd_normalize(direction) * initialSpeed
+        let dirLen = simd_length(direction)
+        let safeDirection = dirLen > 0.001 ? direction / dirLen : SIMD3<Float>(1, 0, 0)
+        var velocity = safeDirection * initialSpeed
         var path: [PuttingLine.PathPoint] = []
         var time: Float = 0
 
@@ -331,8 +333,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
             time += dt
             stepCount += 1
 
-            // Record path point every 10 steps (exact integer — avoids float modulo drift)
-            if stepCount % 10 == 0 {
+            // Record path point every 5 steps for smoother visualization near hole (L2 fix)
+            if stepCount % 5 == 0 {
                 path.append(PuttingLine.PathPoint(
                     position: position,
                     velocity: velocity,
@@ -443,8 +445,9 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         // But allow gravity on slopes to legitimately reverse ball direction (uphill rollback)
         let speed = simd_length(newVelocity)
         if speed > 0 && simd_dot(newVelocity, velocity) < 0 {
-            // Check if slope gravity could cause this reversal
-            let gravityComponent = simd_dot(acceleration, simd_normalize(newVelocity))
+            // H5 fix: recompute acceleration at NEW position instead of using stale value
+            let newAcceleration = calculateAcceleration(at: newPosition, velocity: newVelocity, slopeData: slopeData, parameters: parameters, motionPhase: motionPhase)
+            let gravityComponent = simd_dot(newAcceleration, simd_normalize(newVelocity))
             if gravityComponent <= 0 {
                 // No slope force in the reversal direction — pure friction reversal, stop ball
                 newVelocity = .zero

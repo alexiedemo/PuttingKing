@@ -60,9 +60,8 @@ struct HolePosition: Equatable {
         self.timestamp = timestamp
     }
 
-    static let holeRadius: Float = 0.054 // 108mm diameter — keep in sync with PhysicsParameters.holeRadius
-    // NOTE: PhysicsParameters.holeRadius is the canonical source used by the physics engine.
-    // If you change either value, change BOTH to stay in sync.
+    // L5 fix: single source of truth — delegate to PhysicsParameters
+    static var holeRadius: Float { PhysicsParameters.holeRadius }
 }
 
 struct BallPosition: Equatable {
@@ -74,7 +73,8 @@ struct BallPosition: Equatable {
         self.timestamp = timestamp
     }
 
-    static let ballRadius: Float = 0.02135 // 42.7mm diameter — keep in sync with PhysicsParameters.ballRadius
-    // NOTE: PhysicsParameters.ballRadius is the canonical source used by the physics engine.
-    // If you change either value, change BOTH to stay in sync.
+    // L5 fix: single source of truth — delegate to PhysicsParameters
+    // Note: PhysicsParameters.ballRadius is an instance property, but constant (let).
+    // Use a static default instance to access it.
+    static let ballRadius: Float = 0.02135 // Must match PhysicsParameters.ballRadius
 }

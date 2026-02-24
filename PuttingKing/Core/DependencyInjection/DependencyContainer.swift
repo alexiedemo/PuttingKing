@@ -88,7 +88,7 @@ final class DependencyContainer: @unchecked Sendable {
         return service
     }
 
-    var scanHistoryService: ScanHistoryService {
+    @MainActor var scanHistoryService: ScanHistoryService {
         lock.lock()
         defer { lock.unlock() }
 
@@ -123,7 +123,7 @@ final class DependencyContainer: @unchecked Sendable {
         )
     }
 
-    func makeARSessionManager() -> ARSessionManager {
+    @MainActor func makeARSessionManager() -> ARSessionManager {
         ARSessionManager()
     }
 

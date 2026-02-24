@@ -8,7 +8,9 @@ struct ScanSession {
     var state: ScanState
     var holePosition: HolePosition?
     var ballPosition: BallPosition?
-    var meshAnchors: [ARMeshAnchor]
+    // L10: meshAnchors is not populated by the scanning flow — LiDARScanningService.shared
+    // owns the authoritative mesh data. Kept for backwards compatibility but unused.
+    var meshAnchors: [ARMeshAnchor] = []
     var scanProgress: Float
     var scannedArea: Float
 

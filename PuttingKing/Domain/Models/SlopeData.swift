@@ -126,7 +126,17 @@ struct SlopeData {
         // Use spatial grid for fast neighbor lookup
         let candidateIndices = spatialGrid.samplesNear(position: position2D, radius: searchRadius) // Grid handles larger queries intrinsically if needed
 
-        guard !candidateIndices.isEmpty else {
+        // L4 fix: if no candidates at initial radius, try progressively wider
+        // search before falling back to global dominant direction
+        var effectiveCandidates = candidateIndices
+        if effectiveCandidates.isEmpty {
+            for expandedRadius in [0.25, 0.5, 1.0] as [Float] {
+                effectiveCandidates = spatialGrid.samplesNear(position: position2D, radius: expandedRadius)
+                if !effectiveCandidates.isEmpty { break }
+            }
+        }
+
+        guard !effectiveCandidates.isEmpty else {
             // Fallback: return average slope for the entire surface
             if !gradientField.isEmpty {
                 return GradientSample(
@@ -146,7 +156,7 @@ struct SlopeData {
         
         let effectiveRadius = max(searchRadius, 0.1) // Ensure minimum query radius
 
-        for index in candidateIndices {
+        for index in effectiveCandidates {
             // Safety bounds check
             guard index >= 0 && index < gradientField.count else { continue }
             

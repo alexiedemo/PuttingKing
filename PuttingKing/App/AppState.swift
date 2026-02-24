@@ -3,6 +3,7 @@ import SwiftUI
 import Combine
 
 /// Global application state
+@MainActor
 final class AppState: ObservableObject {
     @Published var currentScreen: Screen = .home
     @Published var isOnboardingComplete: Bool {

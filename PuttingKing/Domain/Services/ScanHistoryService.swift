@@ -3,6 +3,7 @@ import CoreData
 import Combine
 
 /// Service for managing scan history persistence
+@MainActor
 final class ScanHistoryService: ObservableObject {
     private let persistenceController: PersistenceController
 

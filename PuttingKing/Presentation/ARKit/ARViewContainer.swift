@@ -13,11 +13,11 @@ struct ARViewContainer: UIViewRepresentable {
         // Configure AR session manager
         arSessionManager.configure(arView: arView)
 
-        // Start session
+        // Start session (M4 fix: log clearly instead of swallowing silently)
         do {
             try arSessionManager.startSession()
         } catch {
-            print("Failed to start AR session: \(error)")
+            print("[ARViewContainer] ERROR: Failed to start AR session: \(error.localizedDescription)")
         }
 
         return arView
@@ -54,7 +54,8 @@ struct ARViewContainer: UIViewRepresentable {
         case (.markingBall, .markingBall): return true
         case (.analyzing, .analyzing): return true
         case (.displayingResult, .displayingResult): return true
-        case (.error, .error): return true
+        // Compare error associated values by message so UI updates on different errors (M3 fix)
+        case (.error(let e1), .error(let e2)): return e1.message == e2.message
         default: return false
         }
     }

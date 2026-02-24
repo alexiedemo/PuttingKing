@@ -110,12 +110,12 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         // Store results for each strategy
         var results: [PuttingStrategy: (result: SimulationResult, speed: Float, angle: Float, confidence: Float)] = [:]
 
-        // Enhanced search parameters
+        // Enhanced search parameters (M7 fix: finer angular resolution)
         // Wider angle search for longer putts with more break
         let baseMaxAngle: Float = .pi / 12 // +/- 15 degrees
         let distanceAngleMultiplier = min(1.5, 1.0 + distance / 10.0) // Wider for longer putts
         let maxAngleOffset = baseMaxAngle * distanceAngleMultiplier
-        let angleSteps = 15 // More granular search
+        let angleSteps = 25 // Finer resolution for breaking putts (was 15)
 
         // Speed variations around each strategy's base speed
         let speedVariations: [Float] = [0.95, 0.98, 1.0, 1.02, 1.05, 1.08]
@@ -190,8 +190,9 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
                             bestForStrategy = candidate
                         }
 
-                        // Early exit for very high confidence
-                        if confidence > 0.85 {
+                        // M8 fix: removed early exit at 0.85 — keep searching for
+                        // better solutions. Timeout protects against excessive runtime.
+                        if confidence > 0.90 {
                             break speedLoop
                         }
                     }
@@ -363,7 +364,24 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         // Use physics-based hole probability
         let entrySpeed = result.entrySpeed ?? 1.0
         let entryOffset = result.entryOffset ?? 0.0
-        let holeProbability = parameters.holeProbability(speed: entrySpeed, offset: entryOffset, angle: 0)
+        // M9 fix: compute actual entry angle instead of passing 0
+        let entryAngle: Float
+        if let lastPathPoint = result.path.dropLast().last {
+            let entryDir = simd_normalize(SIMD3<Float>(
+                result.path.last!.position.x - lastPathPoint.position.x,
+                0,
+                result.path.last!.position.z - lastPathPoint.position.z
+            ))
+            let toHole = simd_normalize(SIMD3<Float>(
+                hole.worldPosition.x - lastPathPoint.position.x,
+                0,
+                hole.worldPosition.z - lastPathPoint.position.z
+            ))
+            entryAngle = acos(min(1.0, max(-1.0, simd_dot(entryDir, toHole))))
+        } else {
+            entryAngle = 0
+        }
+        let holeProbability = parameters.holeProbability(speed: entrySpeed, offset: entryOffset, angle: entryAngle)
         let entryScore = holeProbability * 0.7 + (1.0 - min(entrySpeed / PhysicsParameters.maxCaptureSpeed, 1.0)) * 0.3
 
         // Factor 2: Speed alignment with strategy (25% weight)
@@ -391,13 +409,14 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         let straightnessScore = min(1.0, straightnessRatio * 1.1) // Slight bonus for very straight
 
         // Factor 4: Data quality based on distance (20% weight)
+        // M6 fix: short putts are easier to execute, don't penalize them
         var dataQualityScore: Float = 1.0
         if directDistance < 0.5 {
-            // Very short putts: less slope data, but easier to execute
-            dataQualityScore = 0.8 + (directDistance / 0.5) * 0.2
-        } else if directDistance > 3.0 {
-            // Longer putts: more error accumulation
-            let penalty = (directDistance - 3.0) * 0.05
+            // Very short putts: easier to execute despite less slope data
+            dataQualityScore = 0.95 // Minimal penalty — short putts are reliable
+        } else if directDistance > 5.0 {
+            // Longer putts: more error accumulation — gentler penalty curve
+            let penalty = (directDistance - 5.0) * 0.03
             dataQualityScore = max(0.6, 1.0 - penalty)
         }
 

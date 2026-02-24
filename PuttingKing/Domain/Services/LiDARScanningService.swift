@@ -64,15 +64,14 @@ final class LiDARScanningService: NSObject, ObservableObject {
         _internalIsScanning = true
         meshAnchorsLock.unlock()
 
-        // Update published properties on main thread
+        // Update published properties on main thread (M10 fix: also send Combine events on main)
         DispatchQueue.main.async { [weak self] in
             self?.currentMeshAnchors = []
             self?.vertexCount = 0
             self?.scanQualityValue = 0
             self?.isScanning = true
+            self?.scanQualitySubject.send(0)
         }
-
-        scanQualitySubject.send(0)
 
         print("[LiDAR] Started scanning")
     }
@@ -93,15 +92,14 @@ final class LiDARScanningService: NSObject, ObservableObject {
         _internalIsScanning = true
         meshAnchorsLock.unlock()
 
-        // Update published properties on main thread
+        // Update published properties on main thread (M10 fix: also send Combine events on main)
         DispatchQueue.main.async { [weak self] in
             self?.currentMeshAnchors = []
             self?.vertexCount = 0
             self?.scanQualityValue = 0
             self?.isScanning = true
+            self?.scanQualitySubject.send(0)
         }
-
-        scanQualitySubject.send(0)
 
         let config = createConfiguration()
         session.run(config, options: [.resetTracking, .removeExistingAnchors])
@@ -148,9 +146,8 @@ final class LiDARScanningService: NSObject, ObservableObject {
             self?.vertexCount = 0
             self?.scanQualityValue = 0
             self?.isScanning = false
+            self?.scanQualitySubject.send(0) // M10 fix: send on main thread
         }
-
-        scanQualitySubject.send(0)
     }
 
     /// Get current mesh anchors (thread-safe copy)

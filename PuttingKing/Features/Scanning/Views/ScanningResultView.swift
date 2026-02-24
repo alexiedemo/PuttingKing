@@ -39,7 +39,7 @@ struct ScanningResultView: View {
             HStack(spacing: 6) {
                 Image(systemName: confidenceIcon)
                     .font(.system(size: 12))
-                Text("\(Int(line.confidence * 100))% confidence")
+                Text("\(Int(min(max(line.confidence, 0), 1.0) * 100))% confidence")
                     .font(DesignSystem.Typography.caption)
             }
             .foregroundColor(confidenceColor)

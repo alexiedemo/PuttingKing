@@ -3,12 +3,18 @@ import CoreData
 
 struct HistoryView: View {
     @EnvironmentObject var appState: AppState
-    @ObservedObject private var historyService = DependencyContainer.shared.scanHistoryService
+    // Use ObservedObject with explicit init (not inline default) to clarify lifecycle.
+    // DependencyContainer caches the instance so this is safe.
+    @ObservedObject private var historyService: ScanHistoryService
     @State private var showingDeleteConfirmation = false
     @State private var scanToDelete: ScanRecord?
     @State private var showingClearAllConfirmation = false
     @State private var selectedFilter: HistoryFilter = .all
     @State private var searchText = ""
+
+    init() {
+        _historyService = ObservedObject(wrappedValue: DependencyContainer.shared.scanHistoryService)
+    }
 
     enum HistoryFilter: String, CaseIterable {
         case all = "All"

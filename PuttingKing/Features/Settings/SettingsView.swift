@@ -50,9 +50,8 @@ struct SettingsView: View {
                 }
             }
         }
-        .onChange(of: settings) { _ in
-            saveSettings()
-        }
+        // Removed .onChange auto-save — settings save on Done tap only.
+        // This prevents double UserDefaults writes (old .onChange + AppState.didSet both triggered save()).
         .alert("Reset Settings", isPresented: $showingResetConfirmation) {
             Button("Reset", role: .destructive) {
                 settings.reset()

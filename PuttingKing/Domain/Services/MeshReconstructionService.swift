@@ -22,11 +22,14 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
         var allNormals: [SIMD3<Float>] = []
         var allTriangles: [UInt32] = []
         
-        // Map unique vertices to their index to prevent duplicates
-        // Using a tolerance key string for "fuzzy" equality or just raw value if exact
-        var vertexMap: [SIMD3<Float>: UInt32] = [:] 
+        // Map unique vertices to their index to prevent duplicates.
+        // Uses quantized keys (rounded to 1mm grid) for cross-anchor stitching (fixes M1).
+        var vertexMap: [QuantizedVertex: UInt32] = [:]
 
         for anchor in anchors {
+            // L6 fix: check for Task cancellation between anchor processing
+            try Task.checkCancellation()
+
             let worldVertices = anchor.worldVertices()
             let worldNormals = anchor.worldNormals()
             let triangles = anchor.geometry.extractTriangleIndices()
@@ -167,6 +170,14 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
             }
         }
 
+        // M11 fix: guard against empty filtered surface — if no triangles survived
+        // the radius filter, return the original surface rather than an empty one
+        // that would cause downstream failures in slope analysis and simulation.
+        guard filteredVertices.count >= 3 else {
+            print("[MeshReconstruction] filterGreenMesh: no vertices within radius \(radius)m of center, returning original surface")
+            return surface
+        }
+
         let boundingBox = calculateBoundingBox(filteredVertices)
 
         return GreenSurface(
@@ -182,22 +193,39 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
 
     // MARK: - Helper Methods
 
-    /// Get index of existing vertex or add new one
+    /// Quantized vertex key for deduplication — rounds to 1mm grid for cross-anchor stitching (M1 fix)
+    private struct QuantizedVertex: Hashable {
+        let x: Int32
+        let y: Int32
+        let z: Int32
+
+        init(_ v: SIMD3<Float>) {
+            // Round to 1mm (0.001m) grid
+            x = Int32((v.x * 1000).rounded())
+            y = Int32((v.y * 1000).rounded())
+            z = Int32((v.z * 1000).rounded())
+        }
+    }
+
+    /// Get index of existing vertex or add new one (uses quantized keys for fuzzy dedup)
     private func getOrAddVertex(
         _ position: SIMD3<Float>,
         normal: SIMD3<Float>,
-        map: inout [SIMD3<Float>: UInt32],
+        map: inout [QuantizedVertex: UInt32],
         vertices: inout [SIMD3<Float>],
         normals: inout [SIMD3<Float>]
     ) -> UInt32 {
-        if let existingIdx = map[position] {
+        let key = QuantizedVertex(position)
+        if let existingIdx = map[key] {
+            // Average the normal for shared vertices (better interpolation)
+            normals[Int(existingIdx)] = simd_normalize(normals[Int(existingIdx)] + normal)
             return existingIdx
         }
 
         let newIdx = UInt32(vertices.count)
         vertices.append(position)
         normals.append(normal)
-        map[position] = newIdx
+        map[key] = newIdx
         return newIdx
     }
 
@@ -246,8 +274,14 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
                 }
                 let centroid = neighborSum / Float(neighbors[i].count)
 
-                // Move vertex toward centroid
-                smoothed[i] = current[i] + lambda * (centroid - current[i])
+                // Move vertex toward centroid — reduced Y-axis lambda to preserve
+                // subtle green contours needed for break calculation (M2 fix)
+                let delta = centroid - current[i]
+                smoothed[i] = current[i] + SIMD3<Float>(
+                    lambda * delta.x,
+                    lambda * 0.3 * delta.y,  // 30% Y smoothing to preserve contours
+                    lambda * delta.z
+                )
             }
 
             current = smoothed
