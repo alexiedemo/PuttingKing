@@ -74,16 +74,16 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
             )
         }
 
-        // Calculate statistics
-        let maxSlope = gradientSamples.map(\.slopePercentage).max() ?? 0
-        let avgSlope = gradientSamples.map(\.slopePercentage).reduce(0, +) / Float(gradientSamples.count)
+        // Calculate statistics (var so indoor floor detection can zero them)
+        var maxSlope = gradientSamples.map(\.slopePercentage).max() ?? 0
+        var avgSlope = gradientSamples.map(\.slopePercentage).reduce(0, +) / Float(gradientSamples.count)
 
         // Carpet / Indoor Floor detection:
         // LiDAR is noisy and will create false 1-2% slopes on perfectly flat floors.
-        // If the entire scan has an average slope < 1.5% and no part is steeper than 3.5%, 
+        // If the entire scan has an average slope < 1.5% and no part is steeper than 3.5%,
         // it's highly likely an indoor floor, not a real golf green.
         let isIndoorFloor = avgSlope < 1.5 && maxSlope < 3.5
-        
+
         if isIndoorFloor {
             for i in 0..<gradientSamples.count {
                 gradientSamples[i].gradient = .zero
@@ -91,6 +91,10 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
                 gradientSamples[i].slopeAngle = 0
             }
             print("[SlopeAnalysis] Clamped gradients to 0 (Detected flat indoor floor - Avg: \(String(format: "%.1f", avgSlope))%, Max: \(String(format: "%.1f", maxSlope))%)")
+
+            // Zero the reported slope statistics to stay consistent with zeroed gradients
+            maxSlope = 0
+            avgSlope = 0
         }
 
         // Calculate dominant direction (weighted average of gradients)

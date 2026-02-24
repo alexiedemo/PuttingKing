@@ -131,9 +131,15 @@ struct PhysicsParameters {
     /// Calculate friction coefficient from stimpmeter reading
     /// Based on physics: v0^2 = 2 * mu * g * d, where v0 = 1.83 m/s (stimpmeter initial velocity)
     /// Research data from USGA and professional studies
+    ///
+    /// IMPORTANT: This derivation accounts for both the skid and roll phases
+    /// that the simulation uses. The ball undergoes:
+    ///   1. Skid phase (20% of distance): deceleration = skidMult * μ * g
+    ///   2. Roll phase (80% of distance): deceleration = (5/7) * μ * g
+    /// Energy balance: v₀² = 2 * μ * g * d * (skidMult * skidRatio + (5/7) * rollRatio)
     static func calculateFriction(from stimpmeter: Float, moisture: Float = 0.0) -> Float {
         // Stimpmeter releases ball at 1.83 m/s (from 20° ramp, 30" release point)
-        let stimpmeterInitialVelocity: Float = 1.83
+        let v0: Float = 1.83
 
         // Safety clamp: stimpmeter must be positive to avoid divide-by-zero
         let clampedStimpmeter = max(stimpmeter, 1.0)
@@ -141,11 +147,21 @@ struct PhysicsParameters {
         // Convert stimpmeter feet to meters
         let stimpmeterMeters = clampedStimpmeter * 0.3048
 
-        // Derive friction coefficient mu from stimpmeter kinematic equation:
-        // Ball decelerates at a = (5/7)*mu*g during pure rolling
-        // From 0 = v0^2 - 2*a*d: mu = v0^2 / (2 * (5/7) * g * d) = (7/5) * v0^2 / (2*g*d)
-        var baseFriction = pow(stimpmeterInitialVelocity, 2) / (2 * 9.81 * stimpmeterMeters)
-        baseFriction /= rollingDecelerationFactor
+        // Derive friction coefficient mu accounting for both simulation phases.
+        // The ball skids for 20% of distance at 1.8× friction, then rolls for 80%
+        // at (5/7)× friction. This must match the simulation model exactly so that
+        // a flat putt at v₀ = 1.83 m/s reproduces the stimpmeter distance.
+        //
+        // Energy balance: v₀² = 2 * μ * g * d * combinedFactor
+        // where combinedFactor = skidMult * skidRatio + (5/7) * rollRatio
+        //                      = 1.8 * 0.20 + (5/7) * 0.80
+        //                      = 0.36 + 0.5714 = 0.9314
+        let skidMult: Float = 1.8       // matches skidFrictionMultiplier
+        let skidRatio: Float = 0.20     // matches skidDistanceRatio
+        let rollRatio: Float = 0.80     // 1.0 - skidRatio
+        let combinedFactor = skidMult * skidRatio + rollingDecelerationFactor * rollRatio
+
+        let baseFriction = (v0 * v0) / (2.0 * 9.81 * stimpmeterMeters * combinedFactor)
 
         // Apply moisture adjustment (wet greens are slower)
         // Research shows moisture can increase friction by 20-50%
@@ -154,10 +170,10 @@ struct PhysicsParameters {
         return baseFriction * moistureAdjustment
     }
 
-    /// Calculate rolling resistance from stimpmeter
+    /// Calculate rolling resistance from stimpmeter (used for rolling-only scenarios)
     static func calculateRollingResistance(from stimpmeter: Float) -> Float {
         let baseFriction = calculateFriction(from: stimpmeter)
-        return baseFriction * 0.8
+        return baseFriction * 0.8 // Rolling resistance is ~80% of sliding friction
     }
 
     /// Calculate deceleration during pure rolling phase
@@ -172,12 +188,17 @@ struct PhysicsParameters {
     }
 
     /// Calculate initial ball speed needed to roll a given distance on flat green
-    /// Accounts for both skid and roll phases
+    /// Accounts for both skid and roll phases to match the simulation model exactly.
     func initialSpeedForDistance(_ distance: Float) -> Float {
-        // Simplified model: use average deceleration
-        // More accurate would be to integrate both phases
-        let avgDeceleration = rollingDeceleration()
-        return sqrt(2.0 * avgDeceleration * distance)
+        // The ball undergoes two phases on flat ground:
+        //   Skid (20% of distance):  a_skid = skidFrictionMultiplier * μ * g
+        //   Roll (80% of distance):  a_roll = (5/7) * μ * g
+        // Energy balance: v₀² = 2 * (a_skid * d_skid + a_roll * d_roll)
+        let skidDecel = frictionCoefficient * skidFrictionMultiplier * gravity
+        let rollDecel = Self.rollingDecelerationFactor * frictionCoefficient * gravity
+        let d_skid = distance * skidDistanceRatio
+        let d_roll = distance * (1.0 - skidDistanceRatio)
+        return sqrt(2.0 * (skidDecel * d_skid + rollDecel * d_roll))
     }
 
     /// Calculate initial speed to reach hole with optimal capture speed
@@ -189,10 +210,17 @@ struct PhysicsParameters {
     }
 
     /// Estimate distance ball will roll from given initial speed on flat green
+    /// Accounts for both skid and roll phases to match the simulation model exactly.
     func distanceForInitialSpeed(_ speed: Float) -> Float {
-        let deceleration = rollingDeceleration()
-        guard deceleration > 0 else { return 0 }
-        return (speed * speed) / (2.0 * deceleration)
+        // Weighted average deceleration matching the two simulation phases:
+        //   Skid (20% of distance):  a_skid = skidFrictionMultiplier * μ * g
+        //   Roll (80% of distance):  a_roll = (5/7) * μ * g
+        // Combined: a_avg = a_skid * skidRatio + a_roll * rollRatio
+        let skidDecel = frictionCoefficient * skidFrictionMultiplier * gravity
+        let rollDecel = Self.rollingDecelerationFactor * frictionCoefficient * gravity
+        let combinedDecel = skidDecel * skidDistanceRatio + rollDecel * (1.0 - skidDistanceRatio)
+        guard combinedDecel > 0 else { return 0 }
+        return (speed * speed) / (2.0 * combinedDecel)
     }
 
     /// Apply grain effect to friction based on ball travel direction vs grain direction

@@ -450,16 +450,23 @@ final class ScanningViewModel: ObservableObject {
             print("[ViewModel] Surface reconstructed: \(surface.vertexCount) vertices")
 
             // Step 2: Filter to relevant area (between ball and hole + buffer)
+            // Run off main thread since this is pure computation on large meshes
             let center = (ball.worldPosition + hole.worldPosition) / 2
             let distance = ball.worldPosition.horizontalDistance(to: hole.worldPosition)
             let radius = distance / 2 + 1.0 // 1m buffer
 
-            let filteredSurface = meshService.filterGreenMesh(from: surface, around: center, radius: radius)
+            let capturedMeshService = meshService
+            let filteredSurface = await Task.detached(priority: .userInitiated) {
+                capturedMeshService.filterGreenMesh(from: surface, around: center, radius: radius)
+            }.value
 
             print("[ViewModel] Filtered surface: \(filteredSurface.vertexCount) vertices")
 
-            // Step 3: Analyze slopes
-            let slopeData = slopeService.analyzeSurface(filteredSurface)
+            // Step 3: Analyze slopes (off main thread to avoid UI jank on large meshes)
+            let capturedSlopeService = slopeService
+            let slopeData = await Task.detached(priority: .userInitiated) {
+                capturedSlopeService.analyzeSurface(filteredSurface)
+            }.value
 
             guard !Task.isCancelled else { return }
 

@@ -93,9 +93,10 @@ private struct SurfaceHeightCache {
         var totalWeight: Float = 0
         var weightedY: Float = 0
 
-        // Search 5×5 cells to cover 0.5m radius
-        for dx: Int32 in -2...2 {
-            for dz: Int32 in -2...2 {
+        // Search 7×7 cells (±3) to fully cover 0.5m radius with 0.15m cells
+        // (±3 cells = ±0.45m from cell center, plus half-cell = 0.525m coverage)
+        for dx: Int32 in -3...3 {
+            for dz: Int32 in -3...3 {
                 let keyCx = cx + dx
                 let keyCz = cz + dz
                 let key = UInt64(bitPattern: Int64(keyCx)) &<< 32 | UInt64(UInt32(bitPattern: keyCz))

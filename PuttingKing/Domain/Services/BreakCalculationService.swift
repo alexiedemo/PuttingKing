@@ -439,7 +439,9 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
     private func calculatePathLength(_ path: [PuttingLine.PathPoint]) -> Float {
         var length: Float = 0
         for i in 1..<path.count {
-            length += path[i].position.distance(to: path[i - 1].position)
+            // Use horizontal distance (XZ plane) to match the horizontal directDistance
+            // used in the straightness ratio. 3D distance unfairly penalizes sloped putts.
+            length += path[i].position.horizontalDistance(to: path[i - 1].position)
         }
         return length
     }
