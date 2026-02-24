@@ -206,7 +206,10 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
 
                         // M8 fix: removed early exit at 0.85 — keep searching for
                         // better solutions. Timeout protects against excessive runtime.
-                        if confidence > 0.90 {
+                        // Lower threshold for fallback strategies (conservative/aggressive)
+                        // since finding any good result quickly frees time for refinement.
+                        let earlyExitThreshold: Float = strategy == .optimal ? 0.90 : 0.85
+                        if confidence > earlyExitThreshold {
                             break speedLoop
                         }
                     }
