@@ -10,14 +10,20 @@ struct ARViewContainer: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
 
-        // Configure AR session manager
+        // Configure AR session manager (stores reference, sets delegate — no @Published changes)
         arSessionManager.configure(arView: arView)
 
-        // Start session (M4 fix: log clearly instead of swallowing silently)
-        do {
-            try arSessionManager.startSession()
-        } catch {
-            print("[ARViewContainer] ERROR: Failed to start AR session: \(error.localizedDescription)")
+        // Defer session start to next run loop iteration to avoid
+        // "Publishing changes from within view updates" — startSession()
+        // sets @Published isSessionRunning during makeUIView(), which is
+        // part of SwiftUI's view evaluation phase.
+        let manager = arSessionManager
+        DispatchQueue.main.async {
+            do {
+                try manager.startSession()
+            } catch {
+                print("[ARViewContainer] ERROR: Failed to start AR session: \(error.localizedDescription)")
+            }
         }
 
         return arView

@@ -483,13 +483,21 @@ final class ScanningViewModel: ObservableObject {
                 altitudeMeters: settings.altitudeMeters
             )
 
-            if let line = await breakService.findOptimalPutt(
-                from: ball,
-                to: hole,
-                on: filteredSurface,
-                with: slopeData,
-                parameters: parameters
-            ) {
+            // Run break calculation off main thread — simulatePutt() is synchronous
+            // and runs 40-150 times per analysis; keeping it on @MainActor blocks the
+            // UI for seconds, triggering "System gesture gate timed out."
+            let capturedBreakService = breakService
+            let line = await Task.detached(priority: .userInitiated) {
+                await capturedBreakService.findOptimalPutt(
+                    from: ball,
+                    to: hole,
+                    on: filteredSurface,
+                    with: slopeData,
+                    parameters: parameters
+                )
+            }.value
+
+            if let line {
                 // Check cancellation before updating state — timeout may have fired
                 guard !Task.isCancelled else { return }
 

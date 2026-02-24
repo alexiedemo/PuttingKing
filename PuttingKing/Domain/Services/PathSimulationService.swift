@@ -200,6 +200,12 @@ private struct TriangleSurfaceCache {
 final class PathSimulationService: PathSimulationServiceProtocol {
     private let slopeAnalysisService: SlopeAnalysisServiceProtocol
 
+    // Cache the triangle spatial hash across repeated simulations on the same surface.
+    // BreakCalculationService calls simulatePutt 40-150 times per analysis with the
+    // same surface — rebuilding the cache each time was ~91ms/call (the dominant cost).
+    private var cachedSurfaceId: UUID?
+    private var cachedHeightCache: TriangleSurfaceCache?
+
     init(slopeAnalysisService: SlopeAnalysisServiceProtocol) {
         self.slopeAnalysisService = slopeAnalysisService
     }
@@ -236,8 +242,15 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         let dt = parameters.timeStep
         let g = parameters.gravity
 
-        // Build triangle-based spatial cache — barycentric interpolation for exact surface heights
-        let heightCache = TriangleSurfaceCache(vertices: surface.vertices, triangles: surface.triangles)
+        // Reuse or build triangle spatial cache — avoids O(N) rebuild on every simulation
+        let heightCache: TriangleSurfaceCache
+        if surface.id == cachedSurfaceId, let cached = cachedHeightCache {
+            heightCache = cached
+        } else {
+            heightCache = TriangleSurfaceCache(vertices: surface.vertices, triangles: surface.triangles)
+            cachedSurfaceId = surface.id
+            cachedHeightCache = heightCache
+        }
 
         // Record starting point
         path.append(PuttingLine.PathPoint(
