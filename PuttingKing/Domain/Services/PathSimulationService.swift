@@ -226,6 +226,13 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         holePosition: HolePosition,
         parameters: PhysicsParameters
     ) -> SimulationResult {
+        let simStart = CFAbsoluteTimeGetCurrent()
+        defer {
+            let elapsed = (CFAbsoluteTimeGetCurrent() - simStart) * 1000
+            if elapsed > 10 { // Only log slow simulations (>10ms)
+                print("[PathSim] Simulation took \(String(format: "%.1f", elapsed))ms")
+            }
+        }
         // Initial state — guard against zero-direction NaN (L3 fix)
         var position = ball.worldPosition
         let dirLen = simd_length(direction)
@@ -249,13 +256,16 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         let g = parameters.gravity
 
         // Reuse or build triangle spatial cache — avoids O(N) rebuild on every simulation
+        let cacheStart = CFAbsoluteTimeGetCurrent()
         let heightCache: TriangleSurfaceCache
         if surface.id == cachedSurfaceId, let cached = cachedHeightCache {
             heightCache = cached
+            print("[PathSim] Cache HIT (surface \(surface.id.uuidString.prefix(8)))")
         } else {
             heightCache = TriangleSurfaceCache(vertices: surface.vertices, triangles: surface.triangles)
             cachedSurfaceId = surface.id
             cachedHeightCache = heightCache
+            print("[PathSim] Cache MISS — built from \(surface.vertices.count) verts in \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - cacheStart) * 1000))ms (surface \(surface.id.uuidString.prefix(8)))")
         }
 
         // Record starting point
