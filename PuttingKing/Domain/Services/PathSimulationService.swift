@@ -234,6 +234,11 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         var path: [PuttingLine.PathPoint] = []
         var time: Float = 0
 
+        // Skip grain forces on detected flat surfaces (indoor floor / carpet).
+        // Indoor floor detection zeros all gradients and sets maxSlope = 0;
+        // grain forces would cause false lateral break on surfaces with no actual grass.
+        let skipGrain = slopeData.maxSlope == 0
+
         // Calculate estimated putt distance for skid phase
         let estimatedDistance = parameters.distanceForInitialSpeed(initialSpeed)
         let skidDistance = estimatedDistance * parameters.skidDistanceRatio
@@ -373,22 +378,19 @@ final class PathSimulationService: PathSimulationServiceProtocol {
                 )
             }
 
-            // Friction force based on motion phase, adjusted for grain direction
-            // Ball travel direction in XZ plane for grain calculation (needed outside if-block)
+            // Friction force based on motion phase, adjusted for grain direction on real greens
             let ballDir2D = SIMD2<Float>(velocity.x, velocity.z)
             var frictionForce = SIMD3<Float>.zero
             if speed > 0.001 {
                 let velocityDir = simd_normalize(velocity)
                 let frictionMagnitude: Float
-                let grainAdjustedFriction = parameters.frictionWithGrain(ballDirection: ballDir2D)
+                let friction = skipGrain ? parameters.frictionCoefficient : parameters.frictionWithGrain(ballDirection: ballDir2D)
 
                 switch motionPhase {
                 case .skidding:
-                    // Higher friction during skid phase, grain-adjusted
-                    frictionMagnitude = grainAdjustedFriction * parameters.skidFrictionMultiplier * g * cos(slopeAngle)
+                    frictionMagnitude = friction * parameters.skidFrictionMultiplier * g * cos(slopeAngle)
                 case .rolling:
-                    // Pure rolling friction with (5/7) factor, grain-adjusted
-                    frictionMagnitude = PhysicsParameters.rollingDecelerationFactor * grainAdjustedFriction * g * cos(slopeAngle)
+                    frictionMagnitude = PhysicsParameters.rollingDecelerationFactor * friction * g * cos(slopeAngle)
                 case .stopped:
                     frictionMagnitude = 0
                 }
@@ -398,9 +400,11 @@ final class PathSimulationService: PathSimulationServiceProtocol {
 
             // Grain lateral deflection force (cross-grain push)
             var grainForce = SIMD3<Float>.zero
-            let grainAccel = parameters.grainDeflectionAcceleration(ballSpeed: speed, ballDirection: ballDir2D)
-            if simd_length(grainAccel) > 0.0001 {
-                grainForce = SIMD3<Float>(grainAccel.x, 0, grainAccel.y)
+            if !skipGrain {
+                let grainAccel = parameters.grainDeflectionAcceleration(ballSpeed: speed, ballDirection: ballDir2D)
+                if simd_length(grainAccel) > 0.0001 {
+                    grainForce = SIMD3<Float>(grainAccel.x, 0, grainAccel.y)
+                }
             }
 
             // Total acceleration = gravity + friction + grain deflection
@@ -416,7 +420,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
                 dt: dt,
                 parameters: parameters,
                 motionPhase: motionPhase,
-                heightCache: heightCache
+                heightCache: heightCache,
+                skipGrain: skipGrain
             )
 
             // Track distance traveled
@@ -514,7 +519,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         dt: Float,
         parameters: PhysicsParameters,
         motionPhase: BallMotionPhase,
-        heightCache: TriangleSurfaceCache
+        heightCache: TriangleSurfaceCache,
+        skipGrain: Bool = false
     ) -> (position: SIMD3<Float>, velocity: SIMD3<Float>) {
         // k1: derivatives at current state
         let k1v = acceleration * dt
@@ -522,19 +528,19 @@ final class PathSimulationService: PathSimulationServiceProtocol {
 
         // k2: derivatives at midpoint using k1, re-evaluate velocity-dependent forces
         let midVel1 = velocity + k1v / 2
-        let a2 = calculateAccelerationFromSample(slopeSample: slopeSample, velocity: midVel1, parameters: parameters, motionPhase: motionPhase)
+        let a2 = calculateAccelerationFromSample(slopeSample: slopeSample, velocity: midVel1, parameters: parameters, motionPhase: motionPhase, skipGrain: skipGrain)
         let k2v = a2 * dt
         let k2p = midVel1 * dt
 
         // k3: derivatives at midpoint using k2
         let midVel2 = velocity + k2v / 2
-        let a3 = calculateAccelerationFromSample(slopeSample: slopeSample, velocity: midVel2, parameters: parameters, motionPhase: motionPhase)
+        let a3 = calculateAccelerationFromSample(slopeSample: slopeSample, velocity: midVel2, parameters: parameters, motionPhase: motionPhase, skipGrain: skipGrain)
         let k3v = a3 * dt
         let k3p = midVel2 * dt
 
         // k4: derivatives at endpoint using k3
         let endVel = velocity + k3v
-        let a4 = calculateAccelerationFromSample(slopeSample: slopeSample, velocity: endVel, parameters: parameters, motionPhase: motionPhase)
+        let a4 = calculateAccelerationFromSample(slopeSample: slopeSample, velocity: endVel, parameters: parameters, motionPhase: motionPhase, skipGrain: skipGrain)
         let k4v = a4 * dt
         let k4p = endVel * dt
 
@@ -556,7 +562,7 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         let speed = simd_length(newVelocity)
         if speed > 0 && simd_dot(newVelocity, velocity) < 0 {
             // H5 fix: recompute acceleration at current slope with new velocity
-            let newAcceleration = calculateAccelerationFromSample(slopeSample: slopeSample, velocity: newVelocity, parameters: parameters, motionPhase: motionPhase)
+            let newAcceleration = calculateAccelerationFromSample(slopeSample: slopeSample, velocity: newVelocity, parameters: parameters, motionPhase: motionPhase, skipGrain: skipGrain)
             let gravityComponent = simd_dot(newAcceleration, simd_normalize(newVelocity))
             if gravityComponent <= 0 {
                 // No slope force in the reversal direction — pure friction reversal, stop ball
@@ -574,7 +580,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         slopeSample: SlopeData.GradientSample,
         velocity: SIMD3<Float>,
         parameters: PhysicsParameters,
-        motionPhase: BallMotionPhase
+        motionPhase: BallMotionPhase,
+        skipGrain: Bool = false
     ) -> SIMD3<Float> {
         let speed = simd_length(velocity)
         let gradient = slopeSample.gradient
@@ -605,18 +612,18 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         // Ball travel direction in XZ plane for grain calculations
         let ballDir2D = SIMD2<Float>(velocity.x, velocity.z)
 
-        // Friction force with grain direction adjustment
+        // Friction force — use grain-adjusted friction on real greens, base friction on flat surfaces
         var frictionForce = SIMD3<Float>.zero
         if speed > 0.001 {
             let velocityDir = simd_normalize(velocity)
-            let grainAdjustedFriction = parameters.frictionWithGrain(ballDirection: ballDir2D)
+            let friction = skipGrain ? parameters.frictionCoefficient : parameters.frictionWithGrain(ballDirection: ballDir2D)
             let frictionMagnitude: Float
 
             switch motionPhase {
             case .skidding:
-                frictionMagnitude = grainAdjustedFriction * parameters.skidFrictionMultiplier * g * cos(slopeAngle)
+                frictionMagnitude = friction * parameters.skidFrictionMultiplier * g * cos(slopeAngle)
             case .rolling:
-                frictionMagnitude = PhysicsParameters.rollingDecelerationFactor * grainAdjustedFriction * g * cos(slopeAngle)
+                frictionMagnitude = PhysicsParameters.rollingDecelerationFactor * friction * g * cos(slopeAngle)
             case .stopped:
                 frictionMagnitude = 0
             }
@@ -624,11 +631,13 @@ final class PathSimulationService: PathSimulationServiceProtocol {
             frictionForce = -velocityDir * frictionMagnitude
         }
 
-        // Grain lateral deflection (cross-grain push)
+        // Grain lateral deflection (cross-grain push) — skip on flat surfaces (no grass)
         var grainForce = SIMD3<Float>.zero
-        let grainAccel = parameters.grainDeflectionAcceleration(ballSpeed: speed, ballDirection: ballDir2D)
-        if simd_length(grainAccel) > 0.0001 {
-            grainForce = SIMD3<Float>(grainAccel.x, 0, grainAccel.y)
+        if !skipGrain {
+            let grainAccel = parameters.grainDeflectionAcceleration(ballSpeed: speed, ballDirection: ballDir2D)
+            if simd_length(grainAccel) > 0.0001 {
+                grainForce = SIMD3<Float>(grainAccel.x, 0, grainAccel.y)
+            }
         }
 
         return gravityForce + frictionForce + grainForce
