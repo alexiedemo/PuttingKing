@@ -1,6 +1,9 @@
 import Foundation
 import CoreData
 import Combine
+import os
+
+private let logger = Logger(subsystem: "com.puttingking", category: "ScanHistory")
 
 /// Service for managing scan history persistence
 @MainActor
@@ -24,7 +27,7 @@ final class ScanHistoryService: ObservableObject {
         do {
             recentScans = try persistenceController.viewContext.fetch(request)
         } catch {
-            print("Failed to fetch recent scans: \(error)")
+            logger.error("Failed to fetch recent scans: \(error.localizedDescription)")
             recentScans = []
         }
     }
@@ -36,7 +39,7 @@ final class ScanHistoryService: ObservableObject {
         do {
             return try persistenceController.viewContext.fetch(request)
         } catch {
-            print("Failed to fetch all scans: \(error)")
+            logger.error("Failed to fetch all scans: \(error.localizedDescription)")
             return []
         }
     }
@@ -49,7 +52,7 @@ final class ScanHistoryService: ObservableObject {
         do {
             return try persistenceController.viewContext.fetch(request)
         } catch {
-            print("Failed to fetch scans for course: \(error)")
+            logger.error("Failed to fetch scans for course: \(error.localizedDescription)")
             return []
         }
     }
@@ -155,7 +158,7 @@ final class ScanHistoryService: ObservableObject {
             }
             fetchRecentScans()
         } catch {
-            print("Failed to delete all scans: \(error)")
+            logger.error("Failed to delete all scans: \(error.localizedDescription)")
         }
     }
 

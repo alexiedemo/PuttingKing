@@ -45,6 +45,7 @@ struct SettingsView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Done") {
                         saveSettings()
+                        HapticManager.shared.success()
                         appState.currentScreen = .home
                     }
                 }
@@ -367,6 +368,11 @@ struct SettingsView: View {
                 TextField("Course Name", text: $settings.defaultCourseName)
                     .multilineTextAlignment(.trailing)
                     .foregroundColor(.secondary)
+                    .onChange(of: settings.defaultCourseName) { newValue in
+                        if newValue.count > 100 {
+                            settings.defaultCourseName = String(newValue.prefix(100))
+                        }
+                    }
             }
 
             Stepper(value: $settings.defaultHoleNumber, in: 1...18) {

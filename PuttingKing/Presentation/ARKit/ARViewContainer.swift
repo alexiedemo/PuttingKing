@@ -1,6 +1,9 @@
 import SwiftUI
 import RealityKit
 import ARKit
+import os
+
+private let logger = Logger(subsystem: "com.puttingking", category: "ARViewContainer")
 
 /// SwiftUI wrapper for ARView
 struct ARViewContainer: UIViewRepresentable {
@@ -22,7 +25,7 @@ struct ARViewContainer: UIViewRepresentable {
             do {
                 try manager.startSession()
             } catch {
-                print("[ARViewContainer] ERROR: Failed to start AR session: \(error.localizedDescription)")
+                logger.error("Failed to start AR session: \(error.localizedDescription)")
             }
         }
 

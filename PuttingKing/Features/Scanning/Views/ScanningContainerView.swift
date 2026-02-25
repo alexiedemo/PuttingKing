@@ -14,6 +14,8 @@ struct ScanningContainerView: View {
     @State private var analysisProgress: Double = 0
     @State private var analysisTimerTask: Task<Void, Never>?
     @State private var isViewVisible: Bool = true  // Guards stale closures after dismissal
+    @State private var validationDismissWorkItem: DispatchWorkItem?
+    @State private var positionErrorDismissWorkItem: DispatchWorkItem?
 
     // Note: Settings are loaded from AppState in the init via AppSettings.load().
     // This is a snapshot — for a scanning session, stable settings are actually
@@ -52,6 +54,9 @@ struct ScanningContainerView: View {
                     // Clean up async task to prevent memory leaks
                     analysisTimerTask?.cancel()
                     analysisTimerTask = nil
+                    // Cancel pending toast dismissal timers
+                    validationDismissWorkItem?.cancel()
+                    positionErrorDismissWorkItem?.cancel()
                 }
 
             // Crosshair overlay
@@ -301,10 +306,10 @@ struct ScanningContainerView: View {
 
     private var crosshairColor: Color {
         switch viewModel.scanState {
-        case .markingHole: return .yellow
-        case .scanningGreen: return .green
-        case .markingBall: return .cyan
-        default: return .white
+        case .markingHole: return DesignSystem.Colors.stateMarkHole
+        case .scanningGreen: return DesignSystem.Colors.stateScanGreen
+        case .markingBall: return DesignSystem.Colors.stateMarkBall
+        default: return DesignSystem.Colors.stateDefault
         }
     }
 
@@ -315,11 +320,11 @@ struct ScanningContainerView: View {
     }
 
     private func updateCrosshairState() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+        withAnimation(DesignSystem.Springs.bouncy) {
             crosshairScale = 0.8
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            withAnimation(DesignSystem.Springs.bouncy) {
                 crosshairScale = 1.0
             }
         }
@@ -375,13 +380,17 @@ struct ScanningContainerView: View {
             validationErrorMessage = message
         }
 
-        // Auto-dismiss after 3.5 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+        // Cancel any pending dismiss timer to prevent race conditions
+        // when multiple errors fire in quick succession
+        validationDismissWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [self] in
             guard self.isViewVisible else { return }
             withAnimation(.easeInOut(duration: 0.3)) {
                 self.validationErrorMessage = nil
             }
         }
+        validationDismissWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5, execute: workItem)
     }
 
     private var trackingWarningBanner: some View {
@@ -578,7 +587,7 @@ struct ScanningContainerView: View {
                 .foregroundColor(instructionIconColor)
 
             Text(viewModel.instructionText)
-                .font(.system(size: 16, weight: .semibold))
+                .font(DesignSystem.Typography.headline)
                 .foregroundColor(.white)
         }
         .padding(.horizontal, 24)
@@ -602,13 +611,13 @@ struct ScanningContainerView: View {
 
     private var instructionIconColor: Color {
         switch viewModel.scanState {
-        case .markingHole: return .yellow
-        case .scanningGreen: return .green
-        case .markingBall: return .cyan
-        case .analyzing: return .blue
-        case .displayingResult: return .green
-        case .error: return .orange
-        default: return .white
+        case .markingHole: return DesignSystem.Colors.stateMarkHole
+        case .scanningGreen: return DesignSystem.Colors.stateScanGreen
+        case .markingBall: return DesignSystem.Colors.stateMarkBall
+        case .analyzing: return DesignSystem.Colors.stateAnalyzing
+        case .displayingResult: return DesignSystem.Colors.stateResult
+        case .error: return DesignSystem.Colors.stateError
+        default: return DesignSystem.Colors.stateDefault
         }
     }
 
@@ -669,67 +678,35 @@ struct ScanningContainerView: View {
     }
 
     private var scanProgressView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DesignSystem.Spacing.sm) {
             // Circular progress
             ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.2), lineWidth: 6)
-                    .frame(width: 70, height: 70)
-
-                Circle()
-                    .trim(from: 0, to: CGFloat(viewModel.scanProgress))
-                    .stroke(
-                        LinearGradient(
-                            gradient: Gradient(colors: [.green, .green.opacity(0.7)]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                    )
-                    .frame(width: 70, height: 70)
-                    .rotationEffect(.degrees(-90))
+                CircularProgressIndicator(progress: Double(viewModel.scanProgress), size: 70)
 
                 Text("\(Int(viewModel.scanProgress * 100))%")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(DesignSystem.Typography.headline)
                     .foregroundColor(.white)
             }
 
             Text("Scanning green...")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.8))
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(.white.opacity(DesignSystem.Opacity.heavy))
         }
-        .padding(24)
-        .background(.ultraThinMaterial.opacity(0.8))
-        .cornerRadius(20)
+        .padding(DesignSystem.Spacing.lg)
+        .background(.ultraThinMaterial.opacity(DesignSystem.Opacity.heavy))
+        .cornerRadius(DesignSystem.CornerRadius.pill)
     }
 
     private var analyzingView: some View {
-        VStack(spacing: 16) {
-            // Circular progress indicator
+        VStack(spacing: DesignSystem.Spacing.md) {
+            // Circular progress indicator with animated rings
             ZStack {
-                // Background circle
-                Circle()
-                    .stroke(Color.white.opacity(0.2), lineWidth: 6)
-                    .frame(width: 80, height: 80)
-
-                // Progress circle
-                Circle()
-                    .trim(from: 0, to: analysisProgress)
-                    .stroke(
-                        LinearGradient(
-                            gradient: Gradient(colors: [.green, .green.opacity(0.7)]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                    )
-                    .frame(width: 80, height: 80)
-                    .rotationEffect(.degrees(-90))
+                CircularProgressIndicator(progress: analysisProgress, size: 80)
 
                 // Animated rings behind
                 ForEach(0..<3, id: \.self) { index in
                     Circle()
-                        .stroke(Color.green.opacity(0.2), lineWidth: 1)
+                        .stroke(DesignSystem.Colors.primary.opacity(DesignSystem.Opacity.faint), lineWidth: 1)
                         .frame(width: CGFloat(90 + index * 15), height: CGFloat(90 + index * 15))
                         .scaleEffect(pulseAnimation ? 1.1 : 0.9)
                         .opacity(pulseAnimation ? 0 : 0.6)
@@ -744,11 +721,11 @@ struct ScanningContainerView: View {
                 // Center icon
                 Image(systemName: "waveform")
                     .font(.system(size: 24))
-                    .foregroundColor(.green)
+                    .foregroundColor(DesignSystem.Colors.primary)
             }
 
             Text("Analyzing green topology...")
-                .font(.system(size: 16, weight: .semibold))
+                .font(DesignSystem.Typography.headline)
                 .foregroundColor(.white)
 
             // Progress steps
@@ -759,8 +736,8 @@ struct ScanningContainerView: View {
             }
         }
         .padding(28)
-        .background(.ultraThinMaterial.opacity(0.9))
-        .cornerRadius(24)
+        .background(.ultraThinMaterial.opacity(DesignSystem.Opacity.nearOpaque))
+        .cornerRadius(DesignSystem.CornerRadius.large + DesignSystem.CornerRadius.small)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Analyzing putting line, \(Int(analysisProgress * 100)) percent complete")
     }
@@ -935,13 +912,16 @@ struct ScanningContainerView: View {
             showPositionError = true
         }
 
-        // Auto-dismiss after 3 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            guard self.isViewVisible else { return }  // Guard against stale closure on dismissed view
+        // Cancel any pending dismiss timer to prevent race conditions
+        positionErrorDismissWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [self] in
+            guard self.isViewVisible else { return }
             withAnimation(.easeInOut(duration: 0.3)) {
                 self.showPositionError = false
             }
         }
+        positionErrorDismissWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: workItem)
     }
 
     private func mainActionButton(
@@ -997,6 +977,37 @@ struct ScanningContainerView: View {
         }
         .accessibilityLabel(title)
         .accessibilityHint("Double tap to \(title.lowercased())")
+    }
+}
+
+// MARK: - Reusable Circular Progress Indicator
+
+/// Extracted from duplicate code in scanProgressView and analyzingView
+private struct CircularProgressIndicator: View {
+    let progress: Double
+    var size: CGFloat = 70
+    var lineWidth: CGFloat = 6
+    var gradientColors: [Color] = [DesignSystem.Colors.primary, DesignSystem.Colors.primary.opacity(DesignSystem.Opacity.strong)]
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.white.opacity(DesignSystem.Opacity.faint), lineWidth: lineWidth)
+                .frame(width: size, height: size)
+
+            Circle()
+                .trim(from: 0, to: CGFloat(progress))
+                .stroke(
+                    LinearGradient(
+                        gradient: Gradient(colors: gradientColors),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
+                .frame(width: size, height: size)
+                .rotationEffect(.degrees(-90))
+        }
     }
 }
 

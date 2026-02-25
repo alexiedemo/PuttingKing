@@ -316,11 +316,13 @@ struct HistoryView: View {
     private func speedColor(_ speed: String?) -> Color {
         switch speed {
         case "gentle":
-            return .blue
+            return DesignSystem.Colors.speedGentle
+        case "moderate":
+            return DesignSystem.Colors.speedModerate
         case "firm":
-            return .red
+            return DesignSystem.Colors.speedFirm
         default:
-            return .orange
+            return DesignSystem.Colors.speedModerate
         }
     }
 }

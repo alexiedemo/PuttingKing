@@ -101,9 +101,9 @@ struct ScanningResultView: View {
     
     private func speedColor(_ speed: PuttingLine.PuttSpeed) -> Color {
         switch speed {
-        case .gentle: return .cyan
-        case .moderate: return .green
-        case .firm: return .orange
+        case .gentle: return DesignSystem.Colors.speedGentle
+        case .moderate: return DesignSystem.Colors.speedModerate
+        case .firm: return DesignSystem.Colors.speedFirm
         }
     }
 }

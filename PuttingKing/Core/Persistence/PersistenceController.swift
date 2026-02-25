@@ -1,4 +1,7 @@
 import CoreData
+import os
+
+private let logger = Logger(subsystem: "com.puttingking", category: "Persistence")
 
 /// Core Data stack controller with programmatic model definition
 final class PersistenceController {
@@ -130,7 +133,7 @@ final class PersistenceController {
         do {
             try context.save()
         } catch {
-            print("Failed to save Core Data context: \(error)")
+            logger.error("Failed to save Core Data context: \(error.localizedDescription)")
         }
     }
 

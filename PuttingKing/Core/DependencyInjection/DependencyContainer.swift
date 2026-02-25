@@ -186,16 +186,35 @@ enum DesignSystem {
         static let breakLeft = Color.cyan
         static let breakRight = Color.orange
         static let breakStraight = Color.green
+
+        // Speed recommendation colors
+        static let speedGentle = Color.cyan
+        static let speedModerate = Color.green
+        static let speedFirm = Color.orange
+
+        // Scan state colors (crosshair, instruction icons)
+        static let stateMarkHole = Color.yellow
+        static let stateScanGreen = Color.green
+        static let stateMarkBall = Color.cyan
+        static let stateAnalyzing = Color.blue
+        static let stateResult = Color.green
+        static let stateError = Color.orange
+        static let stateDefault = Color.white
     }
-    
+
     // MARK: - Typography
-    
+
     enum Typography {
+        static let display = Font.system(size: 38, weight: .bold, design: .rounded)
+        static let displayValue = Font.system(size: 36, weight: .bold, design: .rounded)
         static let largeTitle = Font.system(size: 28, weight: .bold, design: .rounded)
         static let title = Font.system(size: 20, weight: .bold, design: .rounded)
+        static let subheadline = Font.system(size: 18, weight: .semibold)
         static let headline = Font.system(size: 16, weight: .semibold)
+        static let footnote = Font.system(size: 15, weight: .medium)
         static let body = Font.system(size: 14, weight: .medium)
         static let caption = Font.system(size: 12, weight: .regular)
+        static let small = Font.system(size: 11, weight: .medium)
         static let micro = Font.system(size: 10, weight: .semibold)
     }
     
@@ -222,11 +241,38 @@ enum DesignSystem {
     }
     
     // MARK: - Shadows
-    
+
     enum Shadows {
         static let subtle = Color.black.opacity(0.1)
         static let medium = Color.black.opacity(0.2)
         static let strong = Color.black.opacity(0.3)
+    }
+
+    // MARK: - Opacity
+
+    enum Opacity {
+        static let faint: Double = 0.2
+        static let subtle: Double = 0.3
+        static let medium: Double = 0.5
+        static let strong: Double = 0.7
+        static let heavy: Double = 0.8
+        static let nearOpaque: Double = 0.9
+    }
+
+    // MARK: - Animation Presets
+
+    enum Springs {
+        static let snappy = Animation.spring(response: 0.3, dampingFraction: 0.7)
+        static let gentle = Animation.spring(response: 0.6, dampingFraction: 0.8)
+        static let bouncy = Animation.spring(response: 0.3, dampingFraction: 0.6)
+    }
+
+    // MARK: - Dividers
+
+    enum Dividers {
+        static let subtle = Color.white.opacity(0.2)
+        static let medium = Color.white.opacity(0.3)
+        static let strong = Color.white.opacity(0.4)
     }
 }
 

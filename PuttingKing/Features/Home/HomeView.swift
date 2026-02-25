@@ -15,54 +15,53 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Animated background gradient
-                backgroundGradient
+        // Bug 3 fix: Removed unnecessary NavigationView wrapper — HomeView has
+        // no toolbar items and was hiding the nav bar. ContentView handles navigation.
+        ZStack {
+            // Animated background gradient
+            backgroundGradient
 
-                VStack(spacing: 0) {
-                    Spacer()
+            VStack(spacing: 0) {
+                Spacer()
 
-                    // Logo/Title Section
-                    logoSection
-                        .padding(.bottom, 50)
+                // Logo/Title Section
+                logoSection
+                    .padding(.bottom, DesignSystem.Spacing.xxl)
 
-                    // Green Speed Card
-                    greenSpeedCard
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 30)
+                // Green Speed Card
+                greenSpeedCard
+                    .padding(.horizontal, DesignSystem.Spacing.lg)
+                    .padding(.bottom, DesignSystem.Spacing.xl)
 
-                    // Start Button
-                    startButton
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 20)
+                // Start Button
+                startButton
+                    .padding(.horizontal, DesignSystem.Spacing.lg)
+                    .padding(.bottom, DesignSystem.Spacing.lg)
 
-                    // LiDAR Status
-                    lidarStatusBadge
-                        .padding(.bottom, 30)
+                // LiDAR Status
+                lidarStatusBadge
+                    .padding(.bottom, DesignSystem.Spacing.xl)
 
-                    Spacer()
+                Spacer()
 
-                    // Bottom Navigation
-                    bottomNavigation
-                        .padding(.bottom, 16)
-                }
+                // Bottom Navigation
+                bottomNavigation
+                    .padding(.bottom, DesignSystem.Spacing.md)
             }
-            .navigationBarHidden(true)
-            .onAppear {
-                // Sync slider with latest live settings whenever HomeView appears
-                stimpmeterSpeed = appState.settings.stimpmeterSpeed
-                withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
-                    animateGradient = true
-                }
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3)) {
-                    showStartButton = true
-                }
+        }
+        .onAppear {
+            // Sync slider with latest live settings whenever HomeView appears
+            stimpmeterSpeed = appState.settings.stimpmeterSpeed
+            withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
+                animateGradient = true
             }
-            // Keep local slider in sync if settings change from another screen
-            .onChange(of: appState.settings.stimpmeterSpeed) { newValue in
-                stimpmeterSpeed = newValue
+            withAnimation(DesignSystem.Springs.gentle.delay(0.3)) {
+                showStartButton = true
             }
+        }
+        // Keep local slider in sync if settings change from another screen
+        .onChange(of: appState.settings.stimpmeterSpeed) { newValue in
+            stimpmeterSpeed = newValue
         }
     }
 
@@ -95,21 +94,22 @@ struct HomeView: View {
                 .frame(width: 600, height: 600)
                 .offset(x: animateGradient ? 100 : -100, y: -200)
                 .blur(radius: 60)
+                .drawingGroup() // Bug 14 fix: rasterize to Metal texture for better performance
         )
     }
 
     // MARK: - Logo Section
 
     private var logoSection: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DesignSystem.Spacing.md) {
             // App Icon
             ZStack {
                 Circle()
                     .fill(
                         LinearGradient(
                             gradient: Gradient(colors: [
-                                Color.green.opacity(0.3),
-                                Color.green.opacity(0.1)
+                                DesignSystem.Colors.primary.opacity(DesignSystem.Opacity.subtle),
+                                DesignSystem.Colors.primary.opacity(0.1)
                             ]),
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -119,21 +119,23 @@ struct HomeView: View {
 
                 Image(systemName: "flag.fill")
                     .font(.system(size: 44))
-                    .foregroundColor(.green)
+                    .foregroundColor(DesignSystem.Colors.primary)
             }
 
             // App Name
             Text("PuttingKing")
-                .font(.system(size: 38, weight: .bold, design: .rounded))
+                .font(DesignSystem.Typography.display)
                 .foregroundColor(.white)
 
             // Tagline
             Text("LiDAR Putting Assistant")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+                .font(DesignSystem.Typography.footnote)
+                .foregroundColor(.white.opacity(DesignSystem.Opacity.medium))
                 .tracking(2)
                 .textCase(.uppercase)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("PuttingKing, LiDAR Putting Assistant")
     }
 
     // MARK: - Green Speed Card
@@ -144,12 +146,12 @@ struct HomeView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("GREEN SPEED")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.5))
+                        .font(DesignSystem.Typography.small)
+                        .foregroundColor(.white.opacity(DesignSystem.Opacity.medium))
                         .tracking(1.5)
 
                     Text("Stimpmeter")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(DesignSystem.Typography.subheadline)
                         .foregroundColor(.white)
                 }
 
@@ -158,19 +160,23 @@ struct HomeView: View {
                 // Speed Value
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(String(format: "%.1f", stimpmeterSpeed))
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .foregroundColor(.green)
+                        .font(DesignSystem.Typography.displayValue)
+                        .foregroundColor(DesignSystem.Colors.primary)
 
                     Text("ft")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
+                        .font(DesignSystem.Typography.body)
+                        .foregroundColor(.white.opacity(DesignSystem.Opacity.medium))
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Green speed: \(String(format: "%.1f", stimpmeterSpeed)) feet")
             }
 
             // Slider
-            VStack(spacing: 8) {
+            VStack(spacing: DesignSystem.Spacing.xs) {
                 Slider(value: $stimpmeterSpeed, in: 6...14, step: 0.5)
-                    .accentColor(.green)
+                    .accentColor(DesignSystem.Colors.primary)
+                    .accessibilityLabel("Green speed, Stimpmeter")
+                    .accessibilityValue("\(String(format: "%.1f", stimpmeterSpeed)) feet")
                     .onChange(of: stimpmeterSpeed) { newValue in
                         // L12 fix: use centralized HapticManager (pre-prepared generator)
                         // and respect the haptic enabled setting
@@ -211,11 +217,11 @@ struct HomeView: View {
     private func speedLabel(_ value: String, description: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.white.opacity(0.7))
+                .font(DesignSystem.Typography.caption)
+                .foregroundColor(.white.opacity(DesignSystem.Opacity.strong))
             Text(description)
-                .font(.system(size: 10))
-                .foregroundColor(.white.opacity(0.4))
+                .font(DesignSystem.Typography.micro)
+                .foregroundColor(.white.opacity(DesignSystem.Opacity.subtle))
         }
     }
 
@@ -226,19 +232,19 @@ struct HomeView: View {
                 .fill(color)
                 .frame(width: 8, height: 8)
             Text(text)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.7))
+                .font(DesignSystem.Typography.caption)
+                .foregroundColor(.white.opacity(DesignSystem.Opacity.strong))
         }
         .pillBadge(backgroundColor: color)
     }
 
     private var speedDescription: (String, Color) {
         switch stimpmeterSpeed {
-        case 6..<8: return ("Slow - Practice Green", .blue)
+        case 6..<8: return ("Slow - Practice Green", DesignSystem.Colors.info)
         case 8..<10: return ("Medium - Public Course", .cyan)
-        case 10..<12: return ("Fast - Private Club", .green)
+        case 10..<12: return ("Fast - Private Club", DesignSystem.Colors.primary)
         case 12..<14: return ("Very Fast - Tournament", .yellow)
-        default: return ("Championship Speed", .orange)
+        default: return ("Championship Speed", DesignSystem.Colors.warning)
         }
     }
 
@@ -250,7 +256,7 @@ struct HomeView: View {
         Button(action: {
             guard !isStarting else { return }
             isStarting = true
-            
+
             HapticManager.shared.mediumImpact()
 
             // Brief loading state for smoother transition
@@ -285,28 +291,32 @@ struct HomeView: View {
                     endPoint: .trailing
                 )
             )
-            .cornerRadius(16)
+            .cornerRadius(DesignSystem.CornerRadius.large)
             .shadow(color: Color.green.opacity(0.4), radius: 20, y: 8)
         }
         .disabled(isStarting)
         .scaleEffect(showStartButton ? 1.0 : 0.8)
         .opacity(showStartButton ? 1.0 : 0.0)
+        .accessibilityLabel(isStarting ? "Loading" : "Start Scanning")
+        .accessibilityHint("Double tap to begin putting analysis")
     }
 
     // MARK: - LiDAR Status
 
     private var lidarStatusBadge: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DesignSystem.Spacing.xs) {
             Image(systemName: LiDARScanningService.isLiDARSupported ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 14))
+                .font(DesignSystem.Typography.body)
 
             Text(LiDARScanningService.isLiDARSupported ? "LiDAR Ready" : "LiDAR Not Available")
                 .font(.system(size: 13, weight: .medium))
         }
         .pillBadge(
-            backgroundColor: LiDARScanningService.isLiDARSupported ? .green : .orange,
-            foregroundColor: LiDARScanningService.isLiDARSupported ? .green : .orange
+            backgroundColor: LiDARScanningService.isLiDARSupported ? DesignSystem.Colors.success : DesignSystem.Colors.warning,
+            foregroundColor: LiDARScanningService.isLiDARSupported ? DesignSystem.Colors.success : DesignSystem.Colors.warning
         )
+        .accessibilityLabel("LiDAR status")
+        .accessibilityValue(LiDARScanningService.isLiDARSupported ? "Ready" : "Not available")
     }
 
     // MARK: - Bottom Navigation
@@ -326,16 +336,18 @@ struct HomeView: View {
 
     private func navButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 8) {
+            VStack(spacing: DesignSystem.Spacing.xs) {
                 Image(systemName: icon)
                     .font(.system(size: 22))
 
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(DesignSystem.Typography.caption)
             }
-            .foregroundColor(.white.opacity(0.6))
+            .foregroundColor(.white.opacity(DesignSystem.Opacity.medium))
             .frame(width: 70)
         }
+        .accessibilityLabel(title)
+        .accessibilityHint("Double tap to open \(title.lowercased())")
     }
 }
 
