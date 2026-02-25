@@ -193,7 +193,7 @@ final class ScanHistoryService: ObservableObject {
             let results = try persistenceController.viewContext.fetch(request)
             return results.compactMap { $0["courseName"] as? String }
         } catch {
-            print("Failed to fetch unique course names: \(error)")
+            logger.error("Failed to fetch unique course names: \(error.localizedDescription)")
             return []
         }
     }
