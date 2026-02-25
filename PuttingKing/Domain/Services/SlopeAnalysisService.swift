@@ -1,5 +1,8 @@
 import Foundation
+import os
 import simd
+
+private let logger = Logger(subsystem: "com.puttingking", category: "SlopeAnalysis")
 
 /// Protocol for slope analysis
 protocol SlopeAnalysisServiceProtocol {
@@ -106,7 +109,10 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
             maxSlope *= scaleFactor
             avgSlope *= scaleFactor
             if flatConfidence > 0.5 {
-                print("[SlopeAnalysis] Attenuated gradients by \(Int(flatConfidence * 100))% (near-flat surface - Avg: \(String(format: "%.1f", avgSlope))%, Max: \(String(format: "%.1f", maxSlope))%)")
+                let attPct = Int(flatConfidence * 100)
+                let avgStr = String(format: "%.1f", avgSlope)
+                let maxStr = String(format: "%.1f", maxSlope)
+                logger.info("Attenuated gradients by \(attPct)% (near-flat surface - Avg: \(avgStr)%, Max: \(maxStr)%)")
             }
         }
 
@@ -116,7 +122,9 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
             ? simd_normalize(totalGradient)
             : .zero
 
-        print("[SlopeAnalysis] Analyzed \(gradientSamples.count) valid samples, avg slope: \(String(format: "%.1f", avgSlope))%, max: \(String(format: "%.1f", maxSlope))%")
+        let finalAvgStr = String(format: "%.1f", avgSlope)
+        let finalMaxStr = String(format: "%.1f", maxSlope)
+        logger.info("Analyzed \(gradientSamples.count) valid samples, avg slope: \(finalAvgStr)%, max: \(finalMaxStr)%")
 
         return SlopeData(
             gradientField: gradientSamples,

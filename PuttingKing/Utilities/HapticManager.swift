@@ -1,5 +1,8 @@
 import UIKit
 import CoreHaptics
+import os
+
+private let logger = Logger(subsystem: "com.puttingking", category: "Haptics")
 
 /// Centralized haptic feedback manager for consistent feedback throughout the app
 /// Based on Apple's Human Interface Guidelines for haptic feedback
@@ -179,13 +182,13 @@ final class HapticManager {
 
                 // Handle engine stopping — M16 fix: restart on serialized queue
                 engine.stoppedHandler = { [weak self] reason in
-                    print("[HapticManager] Engine stopped: \(reason.rawValue)")
+                    logger.info("Engine stopped: \(reason.rawValue)")
                     self?.restartHapticEngine()
                 }
 
                 // Handle engine reset
                 engine.resetHandler = { [weak self] in
-                    print("[HapticManager] Engine reset")
+                    logger.info("Engine reset")
                     self?.engineQueue.async {
                         try? self?.hapticEngine?.start()
                     }
@@ -193,7 +196,7 @@ final class HapticManager {
 
                 self?.hapticEngine = engine
             } catch {
-                print("[HapticManager] Failed to create haptic engine: \(error)")
+                logger.error("Failed to create haptic engine: \(error.localizedDescription)")
             }
         }
     }
@@ -209,7 +212,8 @@ final class HapticManager {
                     try self?.hapticEngine?.start()
                 } catch {
                     if attempt == delays.count - 1 {
-                        print("[HapticManager] Engine restart failed after \(delays.count) attempts: \(error)")
+                        let attemptCount = delays.count
+                        logger.error("Engine restart failed after \(attemptCount) attempts: \(error.localizedDescription)")
                     }
                 }
             }
@@ -251,7 +255,7 @@ final class HapticManager {
                 let player = try self?.hapticEngine?.makePlayer(with: pattern)
                 try player?.start(atTime: CHHapticTimeImmediate)
             } catch {
-                print("[HapticManager] Failed to play custom haptic: \(error)")
+                logger.error("Failed to play custom haptic: \(error.localizedDescription)")
                 DispatchQueue.main.async { [weak self] in
                     self?.success() // Fallback
                 }
@@ -291,7 +295,7 @@ final class HapticManager {
                 let player = try self?.hapticEngine?.makePlayer(with: pattern)
                 try player?.start(atTime: CHHapticTimeImmediate)
             } catch {
-                print("[HapticManager] Failed to play heartbeat: \(error)")
+                logger.error("Failed to play heartbeat: \(error.localizedDescription)")
                 DispatchQueue.main.async { [weak self] in
                     self?.softImpact()
                 }
@@ -335,7 +339,7 @@ final class HapticManager {
                 let player = try self?.hapticEngine?.makePlayer(with: pattern)
                 try player?.start(atTime: CHHapticTimeImmediate)
             } catch {
-                print("[HapticManager] Failed to play scan texture: \(error)")
+                logger.error("Failed to play scan texture: \(error.localizedDescription)")
             }
         }
     }

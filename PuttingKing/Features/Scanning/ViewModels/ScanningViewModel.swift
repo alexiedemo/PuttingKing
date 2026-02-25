@@ -1,7 +1,10 @@
 import Foundation
 import ARKit
 import Combine
+import os
 import UIKit
+
+private let logger = Logger(subsystem: "com.puttingking", category: "ScanningVM")
 
 /// ViewModel for the scanning flow
 @MainActor
@@ -169,7 +172,8 @@ final class ScanningViewModel: ObservableObject {
         scanProgress = min(Float(vertexCount) / targetVertices, 1.0)
         currentSession?.scanProgress = scanProgress
 
-        print("[ViewModel] Scan progress: \(Int(scanProgress * 100))%, vertices: \(vertexCount)")
+        let pct = Int(scanProgress * 100)
+        logger.debug("Scan progress: \(pct)%, vertices: \(self.vertexCount)")
     }
 
     // MARK: - User Actions
@@ -193,13 +197,13 @@ final class ScanningViewModel: ObservableObject {
         // Reset LiDAR service
         lidarService.reset()
 
-        print("[ViewModel] Started new scan - state: markingHole")
+        logger.info("Started new scan - state: markingHole")
     }
 
     /// Mark the hole position
     func markHole(at position: SIMD3<Float>) {
         guard scanState == .markingHole else {
-            print("[ViewModel] Cannot mark hole - wrong state: \(scanState)")
+            logger.warning("Cannot mark hole - wrong state: \(String(describing: self.scanState))")
             return
         }
 
@@ -214,9 +218,9 @@ final class ScanningViewModel: ObservableObject {
         // Start LiDAR scanning
         do {
             try lidarService.startScanning()
-            print("[ViewModel] Marked hole at \(position), started scanning")
+            logger.info("Marked hole at \(position), started scanning")
         } catch {
-            print("[ViewModel] Failed to start scanning: \(error)")
+            logger.error("Failed to start scanning: \(error)")
             self.error = .lidarUnavailable
             scanState = .error(.lidarUnavailable)
         }
@@ -225,7 +229,7 @@ final class ScanningViewModel: ObservableObject {
     /// Mark the ball position
     func markBall(at position: SIMD3<Float>) {
         guard scanState == .scanningGreen else {
-            print("[ViewModel] Cannot mark ball - wrong state: \(scanState)")
+            logger.warning("Cannot mark ball - wrong state: \(String(describing: self.scanState))")
             return
         }
 
@@ -237,7 +241,7 @@ final class ScanningViewModel: ObservableObject {
         scanState = .markingBall
         currentSession?.state = .markingBall
 
-        print("[ViewModel] Marked ball at \(position)")
+        logger.info("Marked ball at \(position)")
     }
 
     /// Confirm ball position and start analysis
@@ -245,7 +249,7 @@ final class ScanningViewModel: ObservableObject {
         guard scanState == .markingBall,
               let ball = ballPosition,
               let hole = holePosition else {
-            print("[ViewModel] Cannot confirm - missing data")
+            logger.warning("Cannot confirm - missing data")
             return
         }
 
@@ -272,7 +276,7 @@ final class ScanningViewModel: ObservableObject {
         isAnalyzing = true
         currentSession?.state = .analyzing
 
-        print("[ViewModel] Starting analysis with \(vertexCount) vertices")
+        logger.info("Starting analysis with \(self.vertexCount) vertices")
 
         analysisTask = Task { [weak self] in
             guard let self else { return }
@@ -318,9 +322,9 @@ final class ScanningViewModel: ObservableObject {
         // Restart scanning
         do {
             try lidarService.startScanning()
-            print("[ViewModel] Started new putt")
+            logger.info("Started new putt")
         } catch {
-            print("[ViewModel] Failed to restart scanning: \(error)")
+            logger.error("Failed to restart scanning: \(error)")
             self.error = .lidarUnavailable
             scanState = .error(.lidarUnavailable)
         }
@@ -345,7 +349,7 @@ final class ScanningViewModel: ObservableObject {
         scanProgress = 0
         isAnalyzing = false
 
-        print("[ViewModel] Cancelled scan")
+        logger.info("Cancelled scan")
     }
 
     // Note: deinit removed — AnyCancellable auto-cancels on dealloc,
@@ -357,7 +361,7 @@ final class ScanningViewModel: ObservableObject {
     func resumeScanningIfNeeded() {
         guard scanState == .scanningGreen else { return }
         lidarService.resumeScanning()
-        print("[ViewModel] Resumed LiDAR scanning after foreground")
+        logger.info("Resumed LiDAR scanning after foreground")
     }
 
     /// Redo hole marking
@@ -383,13 +387,13 @@ final class ScanningViewModel: ObservableObject {
         scanState = .markingHole
         currentSession?.state = .markingHole
 
-        print("[ViewModel] Redoing hole marking")
+        logger.info("Redoing hole marking")
     }
 
     /// Save the current scan to history
     func saveScan() {
         guard let line = puttingLine else {
-            print("[ViewModel] No putting line to save")
+            logger.warning("No putting line to save")
             return
         }
 
@@ -404,17 +408,17 @@ final class ScanningViewModel: ObservableObject {
 
         switch result {
         case .success:
-            print("[ViewModel] Saved scan to history: \(name) Hole \(holeNumber)")
+            logger.info("Saved scan to history: \(name) Hole \(self.holeNumber)")
             // Increment hole number for next scan
             holeNumber += 1
             if holeNumber > 18 {
                 holeNumber = 1
             }
         case .failure(let error):
-            print("[ViewModel] Save failed: \(error.localizedDescription)")
+            logger.error("Save failed: \(error.localizedDescription)")
             // Note: Could add a @Published saveError property here for UI display
         case .none:
-            print("[ViewModel] No history service configured")
+            logger.warning("No history service configured")
         }
     }
 
@@ -451,7 +455,7 @@ final class ScanningViewModel: ObservableObject {
                     return
                 }
 
-                print("[ViewModel] Reconstructing surface from \(meshAnchors.count) anchors")
+                logger.info("Reconstructing surface from \(meshAnchors.count) anchors")
 
                 let surface = try await meshService.reconstructSurface(from: meshAnchors)
 
@@ -461,7 +465,7 @@ final class ScanningViewModel: ObservableObject {
                 lidarService.reset()
 
                 guard !Task.isCancelled else { return }
-                print("[ViewModel] Surface reconstructed: \(surface.vertexCount) vertices")
+                logger.info("Surface reconstructed: \(surface.vertexCount) vertices")
 
                 // Step 2: Filter to relevant area (between ball and hole + buffer)
                 let center = (ball.worldPosition + hole.worldPosition) / 2
@@ -475,7 +479,7 @@ final class ScanningViewModel: ObservableObject {
                 // meshAnchors + unfiltered surface go out of scope here
             }
 
-            print("[ViewModel] Filtered surface: \(filteredSurface.vertexCount) vertices")
+            logger.info("Filtered surface: \(filteredSurface.vertexCount) vertices")
 
             // Step 3: Analyze slopes (off main thread to avoid UI jank on large meshes)
             let capturedSlopeService = slopeService
@@ -485,7 +489,8 @@ final class ScanningViewModel: ObservableObject {
 
             guard !Task.isCancelled else { return }
 
-            print("[ViewModel] Slope analyzed: avg \(slopeData.averageSlope)%")
+            let avgSlopeStr = String(format: "%.1f", slopeData.averageSlope)
+            logger.info("Slope analyzed: avg \(avgSlopeStr)%")
 
             // Step 4: Calculate optimal putting line with enhanced physics
             let parameters = PhysicsParameters(
@@ -514,7 +519,7 @@ final class ScanningViewModel: ObservableObject {
                 self.scanState = .displayingResult
                 self.currentSession?.state = .displayingResult
                 self.isAnalyzing = false
-                print("[ViewModel] Analysis complete - showing result")
+                logger.info("Analysis complete - showing result")
 
                 // Auto-save if enabled
                 if self.settings.autoSaveScans && self.historyService != nil {
@@ -528,7 +533,7 @@ final class ScanningViewModel: ObservableObject {
                 self.scanState = .displayingResult
                 self.currentSession?.state = .displayingResult
                 self.isAnalyzing = false
-                print("[ViewModel] Using simple straight line")
+                logger.info("Using simple straight line")
 
                 // Auto-save if enabled
                 if self.settings.autoSaveScans && self.historyService != nil {
@@ -541,13 +546,13 @@ final class ScanningViewModel: ObservableObject {
             self.error = scanError
             self.scanState = .error(scanError)
             self.isAnalyzing = false
-            print("[ViewModel] Analysis error: \(scanError.message)")
+            logger.error("Analysis error: \(scanError.message)")
         } catch {
             guard !Task.isCancelled else { return }
             self.error = .unknown(error.localizedDescription)
             self.scanState = .error(.unknown(error.localizedDescription))
             self.isAnalyzing = false
-            print("[ViewModel] Analysis error: \(error)")
+            logger.error("Analysis error: \(error)")
         }
     }
 

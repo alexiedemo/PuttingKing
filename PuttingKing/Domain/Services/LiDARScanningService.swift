@@ -1,6 +1,9 @@
 import Foundation
 import ARKit
 import Combine
+import os
+
+private let logger = Logger(subsystem: "com.puttingking", category: "LiDAR")
 
 /// Service that manages LiDAR scanning and mesh capture
 /// Uses singleton pattern to ensure single source of truth for mesh data
@@ -70,7 +73,7 @@ final class LiDARScanningService: NSObject, ObservableObject {
             self?.scanQualitySubject.send(0)
         }
 
-        print("[LiDAR] Started scanning")
+        logger.info("Started scanning")
     }
 
     /// Start LiDAR scanning with full session reset (use only when needed)
@@ -100,7 +103,7 @@ final class LiDARScanningService: NSObject, ObservableObject {
         let config = createConfiguration()
         session.run(config, options: [.resetTracking, .removeExistingAnchors])
 
-        print("[LiDAR] Started scanning with session reset")
+        logger.info("Started scanning with session reset")
     }
 
     /// Stop scanning
@@ -113,7 +116,7 @@ final class LiDARScanningService: NSObject, ObservableObject {
             self?.isScanning = false
         }
 
-        print("[LiDAR] Stopped scanning")
+        logger.info("Stopped scanning")
     }
 
     /// Resume scanning without clearing existing data (e.g., after app foreground).
@@ -127,7 +130,7 @@ final class LiDARScanningService: NSObject, ObservableObject {
             self?.isScanning = true
         }
 
-        print("[LiDAR] Resumed scanning (preserved existing data)")
+        logger.info("Resumed scanning (preserved existing data)")
     }
 
     /// Reset scan data
@@ -209,7 +212,7 @@ final class LiDARScanningService: NSObject, ObservableObject {
 
         updateMetricsOnMainThread(with: updatedAnchors)
 
-        print("[LiDAR] Added \(meshAnchors.count) anchors, total: \(updatedAnchors.count)")
+        logger.debug("Added \(meshAnchors.count) anchors, total: \(updatedAnchors.count)")
     }
 
     func handleAnchorsUpdated(_ anchors: [ARAnchor]) {

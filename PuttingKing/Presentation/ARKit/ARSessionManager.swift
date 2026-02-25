@@ -2,6 +2,9 @@ import Foundation
 import ARKit
 import RealityKit
 import Combine
+import os
+
+private let logger = Logger(subsystem: "com.puttingking", category: "ARSession")
 
 /// Manages AR session lifecycle and content
 @MainActor
@@ -45,7 +48,7 @@ final class ARSessionManager: NSObject, ObservableObject {
         // Set ourselves as delegate to forward events
         arView.session.delegate = self
 
-        print("[ARSession] Configured")
+        logger.info("Configured")
     }
 
     /// Shared AR configuration factory — single source of truth (fixes H1 duplication)
@@ -83,7 +86,7 @@ final class ARSessionManager: NSObject, ObservableObject {
         // Show mesh visualization
         arView.debugOptions.insert(.showSceneUnderstanding)
 
-        print("[ARSession] Started")
+        logger.info("Started")
     }
 
     /// Stop AR session
@@ -92,7 +95,7 @@ final class ARSessionManager: NSObject, ObservableObject {
         arView?.session.pause()
         isSessionRunning = false
         clearAllAnchors()
-        print("[ARSession] Stopped")
+        logger.info("Stopped")
     }
 
     /// Reset AR session to recalibrate tracking
@@ -110,7 +113,7 @@ final class ARSessionManager: NSObject, ObservableObject {
         arView.session.run(Self.makeConfiguration(), options: [.resetTracking, .removeExistingAnchors])
         isSessionRunning = true
 
-        print("[ARSession] Reset for recalibration")
+        logger.info("Reset for recalibration")
     }
 
     /// Pause AR session
@@ -123,7 +126,7 @@ final class ARSessionManager: NSObject, ObservableObject {
         guard let arView = arView else { return }
         arView.session.run(Self.makeConfiguration())
         isSessionRunning = true
-        print("[ARSession] Resumed")
+        logger.info("Resumed")
     }
 
     // MARK: - Position Marking
@@ -211,7 +214,8 @@ final class ARSessionManager: NSObject, ObservableObject {
         arView.scene.addAnchor(anchor)
         holeAnchor = anchor
 
-        print("[ARSession] Placed hole marker at \(position)")
+        let posStr = "\(position.x), \(position.y), \(position.z)"
+        logger.info("Placed hole marker at \(posStr)")
     }
 
     /// Place ball marker
@@ -236,7 +240,8 @@ final class ARSessionManager: NSObject, ObservableObject {
         arView.scene.addAnchor(anchor)
         ballAnchor = anchor
 
-        print("[ARSession] Placed ball marker at \(position)")
+        let posStr = "\(position.x), \(position.y), \(position.z)"
+        logger.info("Placed ball marker at \(posStr)")
     }
 
     /// Show crosshair at screen center
@@ -912,7 +917,7 @@ extension ARSessionManager: ARSessionDelegate {
             // Pause LiDAR scanning during interruption to prevent data corruption
             self.lidarService.stopScanning()
         }
-        print("[ARSession] Session was interrupted")
+        logger.info("Session was interrupted")
     }
 
     nonisolated func sessionInterruptionEnded(_ session: ARSession) {
@@ -921,11 +926,11 @@ extension ARSessionManager: ARSessionDelegate {
             // Don't unconditionally restart LiDAR — the ViewModel controls scanning lifecycle.
             // LiDAR will resume when the user takes the next scanning action.
         }
-        print("[ARSession] Interruption ended - session resumed")
+        logger.info("Interruption ended - session resumed")
     }
 
     nonisolated func session(_ session: ARSession, didFailWithError error: Error) {
-        print("[ARSession] Session failed with error: \(error.localizedDescription)")
+        logger.error("Session failed with error: \(error.localizedDescription)")
         Task { @MainActor in
             self.isSessionRunning = false
             self.trackingState = .notAvailable

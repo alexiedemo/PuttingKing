@@ -1,6 +1,9 @@
 import Foundation
 import ARKit
+import os
 import simd
+
+private let logger = Logger(subsystem: "com.puttingking", category: "MeshReconstruction")
 
 /// Protocol for mesh reconstruction
 protocol MeshReconstructionServiceProtocol {
@@ -178,7 +181,8 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
         // the radius filter, return the original surface rather than an empty one
         // that would cause downstream failures in slope analysis and simulation.
         guard filteredVertices.count >= 3 else {
-            print("[MeshReconstruction] filterGreenMesh: no vertices within radius \(radius)m of center, returning original surface")
+            let radiusStr = String(format: "%.2f", radius)
+            logger.warning("filterGreenMesh: no vertices within radius \(radiusStr)m of center, returning original surface")
             return surface
         }
 

@@ -1,4 +1,7 @@
 import UIKit
+import os
+
+private let logger = Logger(subsystem: "com.puttingking", category: "AppIconGenerator")
 
 /// Utility to generate the app icon programmatically
 /// Run this in a debug build to export the icon, then add to Assets.xcassets
@@ -172,12 +175,12 @@ struct AppIconGenerator {
     /// Export icon to Documents directory (debug builds only)
     static func exportIcon() {
         guard let icon = generateIcon(size: 1024) else {
-            print("Failed to generate icon")
+            logger.error("Failed to generate icon")
             return
         }
 
         guard let data = icon.pngData() else {
-            print("Failed to convert to PNG")
+            logger.error("Failed to convert to PNG")
             return
         }
 
@@ -186,9 +189,9 @@ struct AppIconGenerator {
 
         do {
             try data.write(to: iconPath)
-            print("Icon exported to: \(iconPath.path)")
+            logger.info("Icon exported to: \(iconPath.path)")
         } catch {
-            print("Failed to save icon: \(error)")
+            logger.error("Failed to save icon: \(error.localizedDescription)")
         }
     }
     #endif

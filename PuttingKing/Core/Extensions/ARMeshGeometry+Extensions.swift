@@ -1,5 +1,8 @@
 import ARKit
 import simd
+import os
+
+private let logger = Logger(subsystem: "com.puttingking", category: "ARMeshGeometry")
 
 extension ARMeshGeometry {
     /// Extract vertices as SIMD3<Float> array
@@ -66,7 +69,7 @@ extension ARMeshGeometry {
 
         // Validate expected primitive type (triangles have 3 indices)
         guard indicesPerFace == 3 else {
-            print("[ARMeshGeometry] Unexpected indices per face: \(indicesPerFace)")
+            logger.error("Unexpected indices per face: \(indicesPerFace)")
             return result
         }
 

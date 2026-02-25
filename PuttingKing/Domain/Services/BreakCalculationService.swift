@@ -1,5 +1,8 @@
 import Foundation
+import os
 import simd
+
+private let logger = Logger(subsystem: "com.puttingking", category: "BreakCalc")
 
 /// Putting strategy for different risk tolerances
 enum PuttingStrategy: String, CaseIterable {
@@ -70,11 +73,11 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
             return optimal
         }
         if let conservative = lines[.conservative] {
-            print("[BreakCalc] Using conservative fallback (optimal timed out)")
+            logger.info("Using conservative fallback (optimal timed out)")
             return conservative
         }
         if let aggressive = lines[.aggressive] {
-            print("[BreakCalc] Using aggressive fallback (optimal/conservative timed out)")
+            logger.info("Using aggressive fallback (optimal/conservative timed out)")
             return aggressive
         }
         return nil
@@ -93,11 +96,12 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
 
         // Guard against zero-distance putts (ball at same position as hole)
         guard distance > 0.001 else {
-            print("[BreakCalc] Ball and hole at same position, skipping calculation")
+            logger.warning("Ball and hole at same position, skipping calculation")
             return [:]
         }
 
-        print("[BreakCalc] Starting multi-strategy calculation, distance: \(String(format: "%.2f", distance))m")
+        let distStr = String(format: "%.2f", distance)
+        logger.info("Starting multi-strategy calculation, distance: \(distStr)m")
 
         // Project to XZ plane before normalizing — preserving Y would cause
         // rotateDirectionHorizontal to produce an aim point that's short in XZ by cos(slope)
@@ -157,13 +161,13 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
                 for angleOffset in angleOffsets {
                     // Check cancellation
                     if Task.isCancelled {
-                        print("[BreakCalc] Task cancelled, exiting grid search early")
+                        logger.info("Task cancelled, exiting grid search early")
                         return [:]
                     }
 
                     // Check timeout
                     if CFAbsoluteTimeGetCurrent() - startTime > maxSearchTime {
-                        print("[BreakCalc] Timeout after \(simulationCount) simulations")
+                        logger.warning("Timeout after \(simulationCount) simulations")
                         break speedLoop
                     }
 
@@ -224,11 +228,12 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
             }
         }
 
-        print("[BreakCalc] Grid search: \(simulationCount) sims, found \(allSuccessfulPutts.count) successful putts in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - startTime))s")
+        let gridTimeStr = String(format: "%.2f", CFAbsoluteTimeGetCurrent() - startTime)
+        logger.info("Grid search: \(simulationCount) sims, found \(allSuccessfulPutts.count) successful putts in \(gridTimeStr)s")
 
         // If no results found, find closest approach as fallback
         if results.isEmpty {
-            print("[BreakCalc] No holing putts found, using closest approach")
+            logger.warning("No holing putts found, using closest approach")
             if let fallback = findClosestApproachEnhanced(
                 from: ball,
                 to: hole,
@@ -275,7 +280,8 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
             let breakInfo = calculateBreak(for: result.result.path, directLine: directDirection)
             let recommendedSpeed = categorizeSpeed(result.speed, baseSpeed: strategySpeeds.first { $0.0 == strategy }?.1 ?? optimalSpeed)
 
-            print("[BreakCalc] \(strategy.rawValue): confidence \(String(format: "%.0f", result.confidence * 100))%, break \(breakInfo.breakDescription)")
+            let confStr = String(format: "%.0f", result.confidence * 100)
+            logger.info("\(strategy.rawValue): confidence \(confStr)%, break \(breakInfo.breakDescription)")
 
             puttingLines[strategy] = PuttingLine(
                 id: UUID(),
@@ -288,7 +294,8 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
             )
         }
 
-        print("[BreakCalc] Complete in \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - startTime))s")
+        let totalTimeStr = String(format: "%.2f", CFAbsoluteTimeGetCurrent() - startTime)
+        logger.info("Complete in \(totalTimeStr)s")
 
         return puttingLines
     }
@@ -524,7 +531,8 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
             for angle in angles {
                 if Task.isCancelled { break }
                 if CFAbsoluteTimeGetCurrent() - fallbackStart > fallbackTimeout {
-                    print("[BreakCalc] Fallback timeout after \(String(format: "%.2f", CFAbsoluteTimeGetCurrent() - fallbackStart))s")
+                    let fallbackTimeStr = String(format: "%.2f", CFAbsoluteTimeGetCurrent() - fallbackStart)
+                    logger.warning("Fallback timeout after \(fallbackTimeStr)s")
                     break
                 }
 
