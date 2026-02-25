@@ -87,10 +87,11 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
         var avgSlope = gradientSamples.map(\.slopePercentage).reduce(0, +) / Float(gradientSamples.count)
 
         // Carpet / Indoor Floor detection:
-        // LiDAR is noisy and will create false 1-2% slopes on perfectly flat floors.
-        // Relaxed thresholds (M5 fix): very flat real greens can have 1-2% slopes,
-        // so only clamp if average is under 0.8% AND max is under 2.0%.
-        let isIndoorFloor = avgSlope < 0.8 && maxSlope < 2.0
+        // LiDAR noise creates false 1-2.5% slopes on perfectly flat floors.
+        // A real putting green with avgSlope < 1.0% AND maxSlope < 2.5% is
+        // extremely flat — the gradient noise dominates any real slope signal,
+        // so zeroing is safe. Real greens with meaningful break have max > 2.5%.
+        let isIndoorFloor = avgSlope < 1.0 && maxSlope < 2.5
 
         if isIndoorFloor {
             for i in 0..<gradientSamples.count {

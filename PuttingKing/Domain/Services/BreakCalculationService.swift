@@ -341,8 +341,9 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
             maxDeviation = min(maxDeviation, maxPossibleBreak)
         }
 
-        // Very small deviations are effectively straight
-        if maxDeviation < 0.02 { // Less than 2cm
+        // Very small deviations are effectively straight.
+        // Professional systems (AimPoint, Pelz) treat < ~1 inch (2.54cm) as straight.
+        if maxDeviation < 0.025 { // Less than 2.5cm (~1 inch)
             return .straight
         }
 
