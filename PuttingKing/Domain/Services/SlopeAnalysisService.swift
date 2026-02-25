@@ -86,24 +86,28 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
         var maxSlope = gradientSamples.map(\.slopePercentage).max() ?? 0
         var avgSlope = gradientSamples.map(\.slopePercentage).reduce(0, +) / Float(gradientSamples.count)
 
-        // Carpet / Indoor Floor detection:
+        // Carpet / Indoor Floor attenuation:
         // LiDAR noise creates false 1-2.5% slopes on perfectly flat floors.
-        // A real putting green with avgSlope < 1.0% AND maxSlope < 2.5% is
-        // extremely flat — the gradient noise dominates any real slope signal,
-        // so zeroing is safe. Real greens with meaningful break have max > 2.5%.
-        let isIndoorFloor = avgSlope < 1.0 && maxSlope < 2.5
+        // Instead of a binary cliff (all-or-nothing zeroing), use smooth attenuation.
+        // At avgSlope ≥ 1.5% or maxSlope ≥ 3.5%: no attenuation (real green).
+        // At avgSlope=0%, maxSlope=0%: full attenuation (definitely flat).
+        // Smooth transition in between prevents LiDAR noise from flipping the result.
+        let avgFlatness = max(Float(0), 1.0 - avgSlope / 1.5)
+        let maxFlatness = max(Float(0), 1.0 - maxSlope / 3.5)
+        let flatConfidence = avgFlatness * maxFlatness
+        let scaleFactor = 1.0 - flatConfidence
 
-        if isIndoorFloor {
+        if flatConfidence > 0.01 {
             for i in 0..<gradientSamples.count {
-                gradientSamples[i].gradient = .zero
-                gradientSamples[i].slopePercentage = 0
-                gradientSamples[i].slopeAngle = 0
+                gradientSamples[i].gradient *= scaleFactor
+                gradientSamples[i].slopePercentage *= scaleFactor
+                gradientSamples[i].slopeAngle *= scaleFactor
             }
-            print("[SlopeAnalysis] Clamped gradients to 0 (Detected flat indoor floor - Avg: \(String(format: "%.1f", avgSlope))%, Max: \(String(format: "%.1f", maxSlope))%)")
-
-            // Zero the reported slope statistics to stay consistent with zeroed gradients
-            maxSlope = 0
-            avgSlope = 0
+            maxSlope *= scaleFactor
+            avgSlope *= scaleFactor
+            if flatConfidence > 0.5 {
+                print("[SlopeAnalysis] Attenuated gradients by \(Int(flatConfidence * 100))% (near-flat surface - Avg: \(String(format: "%.1f", avgSlope))%, Max: \(String(format: "%.1f", maxSlope))%)")
+            }
         }
 
         // Calculate dominant direction (weighted average of gradients)

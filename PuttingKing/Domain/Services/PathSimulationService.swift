@@ -251,6 +251,9 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         var wasInHoleZone = false
         var holeZoneStepCount: Int = 0  // Hysteresis: require 2+ consecutive steps in zone
 
+        // Track last known good height for fallback when ball exits scanned area
+        var lastKnownHeight: Float = ball.worldPosition.y
+
         let dt = parameters.timeStep
         let g = parameters.gravity
 
@@ -425,7 +428,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
                 parameters: parameters,
                 motionPhase: motionPhase,
                 heightCache: heightCache,
-                skipGrain: skipGrain
+                skipGrain: skipGrain,
+                lastKnownHeight: lastKnownHeight
             )
 
             // Track distance traveled
@@ -433,6 +437,7 @@ final class PathSimulationService: PathSimulationServiceProtocol {
 
             previousPosition = position
             position = newPosition
+            lastKnownHeight = newPosition.y
             velocity = newVelocity
             time += dt
             stepCount += 1
@@ -524,7 +529,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         parameters: PhysicsParameters,
         motionPhase: BallMotionPhase,
         heightCache: TriangleSurfaceCache,
-        skipGrain: Bool = false
+        skipGrain: Bool = false,
+        lastKnownHeight: Float = 0
     ) -> (position: SIMD3<Float>, velocity: SIMD3<Float>) {
         // k1: derivatives at current state
         let k1v = acceleration * dt
@@ -555,8 +561,10 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         let posSum = k1p + k2p * 2 + k3p * 2 + k4p
         var newPosition = position + posSum / 6
 
-        // Keep ball on surface (project Y coordinate via spatial cache)
-        newPosition.y = heightCache.projectHeight(at: newPosition, fallbackY: newPosition.y)
+        // Keep ball on surface (project Y coordinate via spatial cache).
+        // Use lastKnownHeight as fallback when ball exits scanned area,
+        // instead of newPosition.y which is the RK4-integrated value (often 0).
+        newPosition.y = heightCache.projectHeight(at: newPosition, fallbackY: lastKnownHeight)
 
         // Ensure velocity stays in XZ plane (ball rolls, doesn't bounce)
         newVelocity.y = 0

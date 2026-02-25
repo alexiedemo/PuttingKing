@@ -99,7 +99,10 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
 
         print("[BreakCalc] Starting multi-strategy calculation, distance: \(String(format: "%.2f", distance))m")
 
-        let directDirection = simd_normalize(hole.worldPosition - ball.worldPosition)
+        // Project to XZ plane before normalizing — preserving Y would cause
+        // rotateDirectionHorizontal to produce an aim point that's short in XZ by cos(slope)
+        let diff = hole.worldPosition - ball.worldPosition
+        let directDirection = simd_normalize(SIMD3<Float>(diff.x, 0, diff.z))
 
         // Calculate base speeds for each strategy
         // Conservative: die at hole (0" past), Optimal: 9" past (AimPoint), Aggressive: 17" past (Pelz)
@@ -344,8 +347,10 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         }
 
         // Very small deviations are effectively straight.
-        // Professional systems (AimPoint, Pelz) treat < ~1 inch (2.54cm) as straight.
-        if maxDeviation < 0.025 { // Less than 2.5cm (~1 inch)
+        // Scale threshold with putt distance: 0.5% of distance, minimum 1.5cm.
+        // Examples: 1m→1.5cm, 5m→2.5cm, 10m→5cm, 15m→7.5cm.
+        let straightThreshold = max(Float(0.015), totalDistance * 0.005)
+        if maxDeviation < straightThreshold {
             return .straight
         }
 
@@ -428,12 +433,26 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         }
 
         // Factor 3: Path quality (25% weight)
-        // Straighter paths are more reliable and easier to execute
+        // Penalize lateral deviation from the direct line, not total path length.
+        // Path-length ratio penalizes natural uphill putts; lateral deviation targets actual break.
         guard let firstPoint = result.path.first else { return 0 }
         let directDistance = firstPoint.position.horizontalDistance(to: hole.worldPosition)
-        let pathLength = calculatePathLength(result.path)
-        let straightnessRatio = pathLength > 0.001 ? directDistance / pathLength : 1.0
-        let straightnessScore = min(1.0, straightnessRatio * 1.1) // Slight bonus for very straight
+        let directLineXZ = simd_normalize(SIMD3<Float>(
+            hole.worldPosition.x - firstPoint.position.x, 0,
+            hole.worldPosition.z - firstPoint.position.z
+        ))
+        var maxLateralDev: Float = 0
+        for point in result.path {
+            let toPoint = SIMD3<Float>(
+                point.position.x - firstPoint.position.x, 0,
+                point.position.z - firstPoint.position.z
+            )
+            let along = simd_dot(toPoint, directLineXZ)
+            let perp = toPoint - directLineXZ * along
+            maxLateralDev = max(maxLateralDev, simd_length(perp))
+        }
+        let deviationRatio = directDistance > 0.001 ? maxLateralDev / directDistance : 0
+        let straightnessScore = max(Float(0), min(1.0, 1.0 - deviationRatio * 2.0))
 
         // Factor 4: Data quality based on distance (20% weight)
         // M6 fix: short putts are easier to execute, don't penalize them
@@ -453,11 +472,18 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
             lipOutPenalty = 0.1
         }
 
+        // Clamp individual factors to [0, 1] before combining — prevents any single
+        // over-valued component from inflating the weighted sum beyond bounds.
+        let clampedEntry = min(max(entryScore, 0), 1.0)
+        let clampedSpeed = min(max(speedScore, 0), 1.0)
+        let clampedStraightness = min(max(straightnessScore, 0), 1.0)
+        let clampedDataQuality = min(max(dataQualityScore, 0), 1.0)
+
         // Weighted combination
-        let rawConfidence = entryScore * 0.30 +
-                           speedScore * 0.25 +
-                           straightnessScore * 0.25 +
-                           dataQualityScore * 0.20 -
+        let rawConfidence = clampedEntry * 0.30 +
+                           clampedSpeed * 0.25 +
+                           clampedStraightness * 0.25 +
+                           clampedDataQuality * 0.20 -
                            lipOutPenalty
 
         // Cap at realistic maximum (never 100% confident in golf!)

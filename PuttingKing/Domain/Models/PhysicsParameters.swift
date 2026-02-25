@@ -274,8 +274,9 @@ struct PhysicsParameters {
         let crossGrainFactor = abs(ballDirNorm.x * grainDir.y - ballDirNorm.y * grainDir.x)
         guard crossGrainFactor > 0.001 else { return .zero }
 
-        // Grain deflection is stronger at lower speeds (ball has less momentum)
-        let speedFactor = min(1.0, 0.5 / max(ballSpeed, 0.1))
+        // Grain deflection is stronger at lower speeds (ball has less momentum).
+        // Smooth sigmoid-style curve: ~1.0 at rest, ~0.2 at 2 m/s, no discontinuity.
+        let speedFactor = 1.0 / (1.0 + ballSpeed * 2.0)
 
         // Project grain direction perpendicular to ball travel direction.
         // This gives the lateral push direction the grain applies to the ball.
@@ -285,7 +286,9 @@ struct PhysicsParameters {
         guard perpLen > 0.001 else { return .zero }
         let perpDir = perpComponent / perpLen
 
-        let magnitude = grassType.grainDeflectionFactor * gravity * speedFactor * crossGrainFactor
+        // Note: perpDir already encodes sin(angle) via the perpendicular projection.
+        // Do NOT multiply by crossGrainFactor here — that would double-count (sin² instead of sin).
+        let magnitude = grassType.grainDeflectionFactor * gravity * speedFactor
 
         return perpDir * magnitude
     }
