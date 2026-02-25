@@ -41,7 +41,7 @@ struct SimulationResult {
         self.reason = reason
         self.entrySpeed = entrySpeed
         self.entryOffset = entryOffset
-        self.closestApproach = closestApproach
+        self.closestApproach = closestApproach.isFinite ? closestApproach : 999.0
         self.lipOutOccurred = lipOutOccurred
     }
 }
@@ -249,6 +249,7 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         // Track closest approach for lip-out detection
         var closestApproach: Float = .infinity
         var wasInHoleZone = false
+        var holeZoneStepCount: Int = 0  // Hysteresis: require 2+ consecutive steps in zone
 
         let dt = parameters.timeStep
         let g = parameters.gravity
@@ -307,10 +308,11 @@ final class PathSimulationService: PathSimulationServiceProtocol {
             let holeDistance = position.horizontalDistance(to: holePosition.worldPosition)
             closestApproach = min(closestApproach, holeDistance)
 
-            // Track if ball entered hole zone
+            // Track if ball entered hole zone (hysteresis: 2+ consecutive steps to confirm)
             let effectiveHoleRadius = PhysicsParameters.holeRadius - parameters.ballRadius
             if holeDistance < effectiveHoleRadius {
-                wasInHoleZone = true
+                holeZoneStepCount += 1
+                if holeZoneStepCount >= 2 { wasInHoleZone = true }
 
                 // Check capture conditions using research-based physics
                 if parameters.canCaptureAtSpeed(speed, entryOffset: holeDistance) {
@@ -343,6 +345,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
                     )
                 }
                 // Ball passed through but was too fast - potential lip-out
+            } else {
+                holeZoneStepCount = 0 // Reset hysteresis when outside hole zone
             }
 
             // Update motion phase based on distance traveled
@@ -560,7 +564,7 @@ final class PathSimulationService: PathSimulationServiceProtocol {
         // Prevent friction-only reversal (friction never reverses a ball)
         // But allow gravity on slopes to legitimately reverse ball direction (uphill rollback)
         let speed = simd_length(newVelocity)
-        if speed > 0 && simd_dot(newVelocity, velocity) < 0 {
+        if speed > 0.001 && simd_dot(newVelocity, velocity) < 0 {
             // H5 fix: recompute acceleration at current slope with new velocity
             let newAcceleration = calculateAccelerationFromSample(slopeSample: slopeSample, velocity: newVelocity, parameters: parameters, motionPhase: motionPhase, skipGrain: skipGrain)
             let gravityComponent = simd_dot(newAcceleration, simd_normalize(newVelocity))

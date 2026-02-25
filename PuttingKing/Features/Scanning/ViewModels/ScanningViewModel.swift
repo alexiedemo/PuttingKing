@@ -493,8 +493,7 @@ final class ScanningViewModel: ObservableObject {
                 grassType: settings.grassType,
                 moistureLevel: settings.greenCondition.moistureLevel,
                 grainDirection: settings.grainDirectionRadians,
-                temperatureCelsius: settings.temperatureCelsius,
-                altitudeMeters: settings.altitudeMeters
+                temperatureCelsius: settings.temperatureCelsius
             )
 
             // Break calculation runs on @MainActor but yields every 10 sims.

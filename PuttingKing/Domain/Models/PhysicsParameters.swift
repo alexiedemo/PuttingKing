@@ -98,8 +98,6 @@ struct PhysicsParameters {
     var gravity: Float = 9.81
     var moistureLevel: Float = 0.0 // 0.0 = dry, 1.0 = very wet
     var temperatureCelsius: Float = 20.0 // Ambient temperature
-    var altitudeMeters: Float = 0.0 // Elevation above sea level
-
     // Simulation settings
     // 5ms timestep (200Hz) — ball moves 2.5-7.5mm per step at typical putt speeds.
     // RK4 integration handles this accurately; professional simulators use 5-10ms.
@@ -112,14 +110,17 @@ struct PhysicsParameters {
     static let rollingDecelerationFactor: Float = 5.0 / 7.0
 
     init(stimpmeterSpeed: Float = 10.0, grassType: GrassType = .bentGrass, moistureLevel: Float = 0.0,
-         grainDirection: Float = 0.0, temperatureCelsius: Float = 20.0, altitudeMeters: Float = 0.0) {
+         grainDirection: Float = 0.0, temperatureCelsius: Float = 20.0) {
         self.stimpmeterSpeed = stimpmeterSpeed
         self.grassType = grassType
         self.moistureLevel = moistureLevel
-        self.grainDirection = grainDirection
-        self.grainDirectionVector = SIMD2<Float>(sin(grainDirection), cos(grainDirection))
         self.temperatureCelsius = temperatureCelsius
-        self.altitudeMeters = altitudeMeters
+
+        // Validate grain direction — NaN would propagate to all grain calculations
+        let safeGrainDirection = grainDirection.isFinite ? grainDirection : 0.0
+        self.grainDirection = safeGrainDirection
+        self.grainDirectionVector = SIMD2<Float>(sin(safeGrainDirection), cos(safeGrainDirection))
+
         self.ballMomentOfInertia = (2.0 / 5.0) * ballMass * pow(Self.ballRadius, 2)
 
         // Calculate base friction with environmental adjustments
@@ -129,9 +130,9 @@ struct PhysicsParameters {
         baseFriction *= grassType.frictionMultiplier
 
         // Apply temperature adjustment: warmer greens are faster (grass blades more pliable)
-        // Research: ~2% speed change per 5°C from baseline 20°C
+        // Research: ~2% speed change per 5°C from baseline 20°C. Clamped to ±15%.
         let tempDelta = temperatureCelsius - 20.0
-        let tempFactor = 1.0 - (tempDelta / 5.0) * 0.02
+        let tempFactor = max(0.85, min(1.15, 1.0 - (tempDelta / 5.0) * 0.02))
         baseFriction *= tempFactor
 
         self.frictionCoefficient = baseFriction
@@ -174,8 +175,9 @@ struct PhysicsParameters {
         let baseFriction = (v0 * v0) / (2.0 * 9.81 * stimpmeterMeters * combinedFactor)
 
         // Apply moisture adjustment (wet greens are slower)
-        // Research shows moisture can increase friction by 20-50%
-        let moistureAdjustment = 1.0 + moisture * 0.4
+        // Research shows moisture can increase friction by 20-50%. Clamp to [0,1].
+        let clampedMoisture = min(max(moisture, 0), 1.0)
+        let moistureAdjustment = 1.0 + clampedMoisture * 0.4
 
         return baseFriction * moistureAdjustment
     }
@@ -291,6 +293,8 @@ struct PhysicsParameters {
     /// Check if ball can be captured at given entry speed and offset
     /// Based on Bristol University lip-out research
     func canCaptureAtSpeed(_ speed: Float, entryOffset: Float = 0) -> Bool {
+        // Guard against NaN — NaN comparisons silently return false
+        guard speed.isFinite && entryOffset.isFinite else { return false }
         // Speed must be below maximum capture speed
         guard speed < Self.maxCaptureSpeed else { return false }
 

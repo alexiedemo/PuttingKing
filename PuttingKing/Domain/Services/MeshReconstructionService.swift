@@ -296,11 +296,14 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
     }
 
     /// Calculate normals from vertices and triangles
+    /// Uses area-weighted accumulation: large stable triangles contribute more than tiny slivers,
+    /// reducing noise bias from degenerate mesh artifacts. Degenerate triangles are skipped entirely.
     private func calculateNormals(vertices: [SIMD3<Float>], triangles: [UInt32]) -> [SIMD3<Float>] {
         var normals = [SIMD3<Float>](repeating: .zero, count: vertices.count)
-        var counts = [Int](repeating: 0, count: vertices.count)
 
-        // Accumulate face normals at each vertex
+        // Accumulate area-weighted face normals at each vertex.
+        // The un-normalized cross product magnitude = 2× triangle area,
+        // so larger faces naturally contribute more weight.
         for i in stride(from: 0, to: triangles.count, by: 3) {
             guard i + 2 < triangles.count else { continue }
             let i0 = Int(triangles[i])
@@ -316,27 +319,24 @@ final class MeshReconstructionService: MeshReconstructionServiceProtocol {
             let edge2 = v2 - v0
             let faceNormal = simd_cross(edge1, edge2)
 
-            // Ensure normal points up
-            let normalizedFaceNormal = simd_length(faceNormal) > 0.0001
-                ? simd_normalize(faceNormal)
-                : SIMD3<Float>(0, 1, 0)
+            // Skip degenerate triangles (near-zero area) instead of defaulting to (0,1,0)
+            guard simd_length(faceNormal) > 0.0001 else { continue }
 
-            let upwardNormal = normalizedFaceNormal.y >= 0 ? normalizedFaceNormal : -normalizedFaceNormal
+            // Ensure normal points up — use UN-normalized vector to preserve area weighting
+            let upwardNormal = faceNormal.y >= 0 ? faceNormal : -faceNormal
 
             normals[i0] += upwardNormal
             normals[i1] += upwardNormal
             normals[i2] += upwardNormal
-            counts[i0] += 1
-            counts[i1] += 1
-            counts[i2] += 1
         }
 
-        // Average and normalize
+        // Normalize accumulated area-weighted normals
         for i in 0..<normals.count {
-            if counts[i] > 0 {
-                normals[i] = simd_normalize(normals[i] / Float(counts[i]))
+            let len = simd_length(normals[i])
+            if len > 0.0001 {
+                normals[i] = normals[i] / len
             } else {
-                normals[i] = SIMD3<Float>(0, 1, 0) // Default up
+                normals[i] = SIMD3<Float>(0, 1, 0) // Default up for isolated vertices
             }
         }
 

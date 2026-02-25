@@ -21,7 +21,10 @@ final class PersistenceController {
 
         container.loadPersistentStores { description, error in
             if let error = error {
-                print("Core Data failed to load: \(error.localizedDescription)")
+                // Core Data must load successfully — the app cannot function without
+                // persistence for scan history. A silent failure here causes crashes
+                // later when saving/fetching records with no store loaded.
+                fatalError("Core Data failed to load: \(error.localizedDescription)")
             }
         }
 

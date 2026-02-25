@@ -71,6 +71,7 @@ struct ScanSession {
 enum ScanError: Error, Equatable {
     case lidarUnavailable
     case cameraPermissionDenied
+    case arSessionFailed
     case meshReconstructionFailed
     case analysisFailedNoPath
     case insufficientData
@@ -82,6 +83,8 @@ enum ScanError: Error, Equatable {
             return "LiDAR is not available on this device"
         case .cameraPermissionDenied:
             return "Camera permission is required"
+        case .arSessionFailed:
+            return "AR session failed to start"
         case .meshReconstructionFailed:
             return "Failed to reconstruct green surface"
         case .analysisFailedNoPath:

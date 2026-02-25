@@ -60,8 +60,9 @@ struct ARViewContainer: UIViewRepresentable {
         case (.markingBall, .markingBall): return true
         case (.analyzing, .analyzing): return true
         case (.displayingResult, .displayingResult): return true
-        // Compare error associated values by message so UI updates on different errors (M3 fix)
-        case (.error(let e1), .error(let e2)): return e1.message == e2.message
+        // Compare error by enum case identity (ScanError: Equatable) — message-based
+        // comparison falsely matched different error types with identical messages
+        case (.error(let e1), .error(let e2)): return e1 == e2
         default: return false
         }
     }

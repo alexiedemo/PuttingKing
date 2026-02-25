@@ -5,6 +5,9 @@ struct HomeView: View {
     @State private var stimpmeterSpeed: Float
     @State private var animateGradient = false
     @State private var showStartButton = false
+    /// Debounce timer — saves settings 0.3s after the last slider change
+    /// instead of on every tick (was 60 writes/sec, now ~3/sec max)
+    @State private var saveTimer: Timer?
 
     init() {
         // Initial value — will be kept in sync via .onChange below
@@ -169,14 +172,22 @@ struct HomeView: View {
                 Slider(value: $stimpmeterSpeed, in: 6...14, step: 0.5)
                     .accentColor(.green)
                     .onChange(of: stimpmeterSpeed) { newValue in
-                        var settings = appState.settings
-                        settings.stimpmeterSpeed = newValue
-                        appState.settings = settings
-
                         // L12 fix: use centralized HapticManager (pre-prepared generator)
                         // and respect the haptic enabled setting
                         if appState.settings.hapticFeedbackEnabled {
                             HapticManager.shared.selectionChanged()
+                        }
+
+                        // Debounce the settings write — persist 0.3s after last slider change
+                        // instead of on every tick (was 60 UserDefaults writes/sec).
+                        // Local @State stimpmeterSpeed keeps the UI responsive immediately.
+                        saveTimer?.invalidate()
+                        saveTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
+                            Task { @MainActor in
+                                var settings = appState.settings
+                                settings.stimpmeterSpeed = newValue
+                                appState.settings = settings  // didSet triggers save()
+                            }
                         }
                     }
 

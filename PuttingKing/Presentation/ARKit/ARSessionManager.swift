@@ -71,7 +71,7 @@ final class ARSessionManager: NSObject, ObservableObject {
 
     /// Start AR session (without starting LiDAR scanning - that happens when hole is marked)
     func startSession() throws {
-        guard let arView = arView else { return }
+        guard let arView = arView else { throw ScanError.arSessionFailed }
 
         guard LiDARScanningService.isLiDARSupported else {
             throw ScanError.lidarUnavailable

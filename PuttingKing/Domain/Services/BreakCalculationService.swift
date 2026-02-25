@@ -244,6 +244,7 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         if CFAbsoluteTimeGetCurrent() - startTime < maxSearchTime - refinementTime {
             for (strategy, result) in results {
                 if Task.isCancelled { break }
+                if CFAbsoluteTimeGetCurrent() - startTime > maxSearchTime { break }
                 if result.result.holesOut {
                     let refined = refineResult(
                         initial: result,
@@ -253,7 +254,8 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
                         slopeData: slopeData,
                         parameters: parameters,
                         directDirection: directDirection,
-                        strategy: strategy
+                        strategy: strategy,
+                        deadline: startTime + maxSearchTime
                     )
                     refinedResults[strategy] = refined
                 }
@@ -383,19 +385,26 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         let entrySpeed = result.entrySpeed ?? 1.0
         let entryOffset = result.entryOffset ?? 0.0
         // M9 fix: compute actual entry angle instead of passing 0
+        // Guard against zero-length vectors (identical consecutive path points → NaN normalize)
         let entryAngle: Float
         if let lastPathPoint = result.path.dropLast().last {
-            let entryDir = simd_normalize(SIMD3<Float>(
+            let rawEntryDir = SIMD3<Float>(
                 result.path.last!.position.x - lastPathPoint.position.x,
                 0,
                 result.path.last!.position.z - lastPathPoint.position.z
-            ))
-            let toHole = simd_normalize(SIMD3<Float>(
+            )
+            let rawToHole = SIMD3<Float>(
                 hole.worldPosition.x - lastPathPoint.position.x,
                 0,
                 hole.worldPosition.z - lastPathPoint.position.z
-            ))
-            entryAngle = acos(min(1.0, max(-1.0, simd_dot(entryDir, toHole))))
+            )
+            if simd_length(rawEntryDir) > 0.001 && simd_length(rawToHole) > 0.001 {
+                let entryDir = simd_normalize(rawEntryDir)
+                let toHole = simd_normalize(rawToHole)
+                entryAngle = acos(min(1.0, max(-1.0, simd_dot(entryDir, toHole))))
+            } else {
+                entryAngle = 0
+            }
         } else {
             entryAngle = 0
         }
@@ -534,7 +543,8 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         slopeData: SlopeData,
         parameters: PhysicsParameters,
         directDirection: SIMD3<Float>,
-        strategy: PuttingStrategy
+        strategy: PuttingStrategy,
+        deadline: CFAbsoluteTime = .infinity
     ) -> (result: SimulationResult, speed: Float, angle: Float, confidence: Float) {
         var best = initial
 
@@ -544,6 +554,8 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
 
         for angleOffset in fineAngleSteps {
             if Task.isCancelled { break }
+            // Timeout guard: bail out if approaching the search deadline
+            if CFAbsoluteTimeGetCurrent() > deadline { break }
             for speedOffset in fineSpeedSteps {
                 let angle = initial.angle + angleOffset
                 let speed = initial.speed * (1 + speedOffset)
