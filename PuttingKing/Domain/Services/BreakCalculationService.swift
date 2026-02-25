@@ -455,23 +455,6 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         return min(max(rawConfidence, 0), 0.92)
     }
 
-    /// Legacy confidence calculation for backward compatibility
-    private func calculateConfidence(
-        result: SimulationResult,
-        hole: HolePosition,
-        speed: Float,
-        baseSpeed: Float
-    ) -> Float {
-        return calculateEnhancedConfidence(
-            result: result,
-            hole: hole,
-            speed: speed,
-            baseSpeed: baseSpeed,
-            strategy: .optimal,
-            parameters: PhysicsParameters(stimpmeterSpeed: 10.0)
-        )
-    }
-
     private func calculatePathLength(_ path: [PuttingLine.PathPoint]) -> Float {
         var length: Float = 0
         for i in 1..<path.count {
@@ -541,27 +524,6 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         return (result.result, result.speed, result.angle, confidence)
     }
 
-    /// Legacy method for compatibility
-    private func findClosestApproachFast(
-        from ball: BallPosition,
-        to hole: HolePosition,
-        on surface: GreenSurface,
-        with slopeData: SlopeData,
-        parameters: PhysicsParameters,
-        baseSpeed: Float,
-        directDirection: SIMD3<Float>
-    ) -> (result: SimulationResult, speed: Float, angle: Float, confidence: Float)? {
-        return findClosestApproachEnhanced(
-            from: ball,
-            to: hole,
-            on: surface,
-            with: slopeData,
-            parameters: parameters,
-            baseSpeed: baseSpeed,
-            directDirection: directDirection
-        )
-    }
-
     /// Enhanced refinement with gradient descent-style optimization
     private func refineResult(
         initial: (result: SimulationResult, speed: Float, angle: Float, confidence: Float),
@@ -615,28 +577,6 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         }
 
         return best
-    }
-
-    /// Legacy method for compatibility
-    private func refineResultFast(
-        initial: (result: SimulationResult, speed: Float, angle: Float, confidence: Float),
-        ball: BallPosition,
-        hole: HolePosition,
-        surface: GreenSurface,
-        slopeData: SlopeData,
-        parameters: PhysicsParameters,
-        directDirection: SIMD3<Float>
-    ) -> (result: SimulationResult, speed: Float, angle: Float, confidence: Float) {
-        return refineResult(
-            initial: initial,
-            ball: ball,
-            hole: hole,
-            surface: surface,
-            slopeData: slopeData,
-            parameters: parameters,
-            directDirection: directDirection,
-            strategy: .optimal
-        )
     }
 
     /// Release cached simulation data to free memory after analysis completes

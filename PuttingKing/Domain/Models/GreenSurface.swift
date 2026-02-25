@@ -73,8 +73,6 @@ struct BallPosition: Equatable {
         self.timestamp = timestamp
     }
 
-    // L5 fix: single source of truth — delegate to PhysicsParameters
-    // Note: PhysicsParameters.ballRadius is an instance property, but constant (let).
-    // Use a static default instance to access it.
-    static let ballRadius: Float = 0.02135 // Must match PhysicsParameters.ballRadius
+    // Single source of truth — delegate to PhysicsParameters (now static)
+    static var ballRadius: Float { PhysicsParameters.ballRadius }
 }

@@ -80,8 +80,7 @@ struct SettingsView: View {
                     .accentColor(.green)
                     .onChange(of: settings.stimpmeterSpeed) { _ in
                         if settings.hapticFeedbackEnabled {
-                            // Use centralized tactile service
-                            HapticManager.shared.playScanTexture()
+                            HapticManager.shared.selectionChanged()
                         }
                     }
 
@@ -341,11 +340,10 @@ struct SettingsView: View {
         Section(header: Text("Feedback")) {
             Toggle("Haptic Feedback", isOn: $settings.hapticFeedbackEnabled)
 
-            // Demo haptic button
+            // Demo haptic button — uses pre-prepared generator via HapticManager
             if settings.hapticFeedbackEnabled {
                 Button(action: {
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
+                    HapticManager.shared.success()
                 }) {
                     HStack {
                         Image(systemName: "hand.tap.fill")

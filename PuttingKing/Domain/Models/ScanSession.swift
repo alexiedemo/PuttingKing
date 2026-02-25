@@ -1,5 +1,4 @@
 import Foundation
-import ARKit
 import simd
 
 /// Active scanning session state
@@ -8,9 +7,6 @@ struct ScanSession {
     var state: ScanState
     var holePosition: HolePosition?
     var ballPosition: BallPosition?
-    // L10: meshAnchors is not populated by the scanning flow — LiDARScanningService.shared
-    // owns the authoritative mesh data. Kept for backwards compatibility but unused.
-    var meshAnchors: [ARMeshAnchor] = []
     var scanProgress: Float
     var scannedArea: Float
 
@@ -60,7 +56,6 @@ struct ScanSession {
         state: ScanState = .idle,
         holePosition: HolePosition? = nil,
         ballPosition: BallPosition? = nil,
-        meshAnchors: [ARMeshAnchor] = [],
         scanProgress: Float = 0,
         scannedArea: Float = 0
     ) {
@@ -68,17 +63,8 @@ struct ScanSession {
         self.state = state
         self.holePosition = holePosition
         self.ballPosition = ballPosition
-        self.meshAnchors = meshAnchors
         self.scanProgress = scanProgress
         self.scannedArea = scannedArea
-    }
-
-    var vertexCount: Int {
-        meshAnchors.reduce(0) { $0 + $1.geometry.vertices.count }
-    }
-
-    var hasMinimumData: Bool {
-        scanProgress >= 0.3 && vertexCount > 1000
     }
 }
 

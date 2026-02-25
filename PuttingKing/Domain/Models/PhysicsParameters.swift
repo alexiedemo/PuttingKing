@@ -61,7 +61,8 @@ enum GrassType: String, CaseIterable, Codable {
 struct PhysicsParameters {
     // Ball properties (USGA standard golf ball specifications)
     let ballMass: Float = 0.04593 // kg (max 45.93g per USGA rules)
-    let ballRadius: Float = 0.02135 // meters (42.7mm diameter minimum)
+    static let ballRadius: Float = 0.02135 // meters (42.7mm diameter minimum)
+    var ballRadius: Float { Self.ballRadius } // Instance accessor for backward compatibility
     let ballMomentOfInertia: Float // I = (2/5) * m * R^2 for solid sphere
 
     // Hole properties (USGA specification)
@@ -88,6 +89,11 @@ struct PhysicsParameters {
     // Grain grows toward the setting sun or water drainage
     var grainDirection: Float = 0.0
 
+    // Pre-computed grain direction unit vector — avoids sin/cos on every simulation step.
+    // frictionWithGrain() and grainDeflectionAcceleration() are called ~1280× per sim;
+    // caching the trig result saves ~2400 sin/cos evaluations per simulation.
+    let grainDirectionVector: SIMD2<Float>
+
     // Environmental
     var gravity: Float = 9.81
     var moistureLevel: Float = 0.0 // 0.0 = dry, 1.0 = very wet
@@ -111,9 +117,10 @@ struct PhysicsParameters {
         self.grassType = grassType
         self.moistureLevel = moistureLevel
         self.grainDirection = grainDirection
+        self.grainDirectionVector = SIMD2<Float>(sin(grainDirection), cos(grainDirection))
         self.temperatureCelsius = temperatureCelsius
         self.altitudeMeters = altitudeMeters
-        self.ballMomentOfInertia = (2.0 / 5.0) * ballMass * pow(ballRadius, 2)
+        self.ballMomentOfInertia = (2.0 / 5.0) * ballMass * pow(Self.ballRadius, 2)
 
         // Calculate base friction with environmental adjustments
         var baseFriction = Self.calculateFriction(from: stimpmeterSpeed, moisture: moistureLevel)
@@ -231,7 +238,7 @@ struct PhysicsParameters {
     func frictionWithGrain(ballDirection: SIMD2<Float>) -> Float {
         guard grassType.grainFactor > 0.001 else { return frictionCoefficient }
 
-        let grainDir = SIMD2<Float>(sin(grainDirection), cos(grainDirection))
+        let grainDir = grainDirectionVector  // Pre-computed in init — no trig per call
         let ballDirLen = simd_length(ballDirection)
         guard ballDirLen > 0.001 else { return frictionCoefficient }
         let ballDirNorm = ballDirection / ballDirLen
@@ -257,8 +264,8 @@ struct PhysicsParameters {
         guard ballDirLen > 0.001 else { return .zero }
         let ballDirNorm = ballDirection / ballDirLen
 
-        // Grain direction vector
-        let grainDir = SIMD2<Float>(sin(grainDirection), cos(grainDirection))
+        // Pre-computed grain direction vector — no trig per call
+        let grainDir = grainDirectionVector
 
         // Cross-grain factor: deflection is max when perpendicular, zero when parallel
         // |sin(angle)| = magnitude of cross product in 2D

@@ -77,8 +77,10 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
         // Post-processing: reject outlier gradients and spatially smooth the field.
         // Even after mesh smoothing, per-vertex normals carry noise from the ~3-6
         // adjacent triangles. Spatial averaging acts as a topology-independent filter.
-        gradientSamples = rejectGradientOutliers(gradientSamples, medianRadius: 0.25, threshold: 3.0)
-        gradientSamples = smoothGradientField(gradientSamples, radius: 0.15)
+        // Build one spatial grid and reuse for both passes (saves ~2ms on large meshes).
+        let postProcessGrid = buildSpatialGrid(samples: gradientSamples, cellSize: 0.15)
+        gradientSamples = rejectGradientOutliers(gradientSamples, grid: postProcessGrid, cellSize: 0.15, medianRadius: 0.25, threshold: 3.0)
+        gradientSamples = smoothGradientField(gradientSamples, grid: postProcessGrid, cellSize: 0.15, radius: 0.15)
 
         // Calculate statistics (var so indoor floor detection can zero them)
         var maxSlope = gradientSamples.map(\.slopePercentage).max() ?? 0
@@ -194,16 +196,11 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
 
     // MARK: - Gradient Field Post-Processing
 
-    /// Reject gradient outliers whose magnitude exceeds threshold × local median
-    private func rejectGradientOutliers(
-        _ samples: [SlopeData.GradientSample],
-        medianRadius: Float,
-        threshold: Float
-    ) -> [SlopeData.GradientSample] {
-        guard samples.count > 3 else { return samples }
-
-        // Build spatial grid for neighbor lookup
-        let cellSize: Float = 0.15
+    /// Build a spatial hash grid from gradient samples — shared across outlier rejection and smoothing
+    private func buildSpatialGrid(
+        samples: [SlopeData.GradientSample],
+        cellSize: Float
+    ) -> [UInt64: [Int]] {
         let invCell = 1.0 / cellSize
         var grid: [UInt64: [Int]] = [:]
         grid.reserveCapacity(samples.count / 4)
@@ -214,7 +211,20 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
             let key = UInt64(bitPattern: Int64(cx)) &<< 32 | UInt64(UInt32(bitPattern: cz))
             grid[key, default: []].append(i)
         }
+        return grid
+    }
 
+    /// Reject gradient outliers whose magnitude exceeds threshold × local median
+    private func rejectGradientOutliers(
+        _ samples: [SlopeData.GradientSample],
+        grid: [UInt64: [Int]],
+        cellSize: Float,
+        medianRadius: Float,
+        threshold: Float
+    ) -> [SlopeData.GradientSample] {
+        guard samples.count > 3 else { return samples }
+
+        let invCell = 1.0 / cellSize
         var result = samples
         let cellRadius = Int(ceil(medianRadius / cellSize))
 
@@ -258,23 +268,13 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
     /// Smooth gradient field by replacing each sample with IDW average of neighbors
     private func smoothGradientField(
         _ samples: [SlopeData.GradientSample],
+        grid: [UInt64: [Int]],
+        cellSize: Float,
         radius: Float
     ) -> [SlopeData.GradientSample] {
         guard samples.count > 1 else { return samples }
 
-        // Build spatial grid
-        let cellSize: Float = 0.15
         let invCell = 1.0 / cellSize
-        var grid: [UInt64: [Int]] = [:]
-        grid.reserveCapacity(samples.count / 4)
-
-        for (i, s) in samples.enumerated() {
-            let cx = Int32(floor(s.position.x * invCell))
-            let cz = Int32(floor(s.position.z * invCell))
-            let key = UInt64(bitPattern: Int64(cx)) &<< 32 | UInt64(UInt32(bitPattern: cz))
-            grid[key, default: []].append(i)
-        }
-
         var result = samples
         let cellRadius = Int(ceil(radius / cellSize))
 
