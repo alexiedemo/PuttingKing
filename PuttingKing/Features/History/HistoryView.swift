@@ -144,7 +144,8 @@ struct HistoryView: View {
     }
 
     private var scanListContent: some View {
-        VStack(spacing: 0) {
+        let scans = filteredScans
+        return VStack(spacing: 0) {
             // Filter picker
             Picker("Filter", selection: $selectedFilter) {
                 ForEach(HistoryFilter.allCases, id: \.self) { filter in
@@ -176,12 +177,12 @@ struct HistoryView: View {
             .padding(.bottom)
 
             // Stats summary
-            if !filteredScans.isEmpty {
+            if !scans.isEmpty {
                 statsSummary
             }
 
             // Scan list
-            if filteredScans.isEmpty {
+            if scans.isEmpty {
                 noResultsView
             } else {
                 scanList
@@ -193,7 +194,9 @@ struct HistoryView: View {
         HStack(spacing: 20) {
             StatView(title: "Scans", value: "\(filteredScans.count)")
             Divider().frame(height: 30)
-            StatView(title: "Avg Distance", value: String(format: "%.1fm", averageDistance))
+            StatView(title: "Avg Distance", value: appState.settings.useMetricUnits
+                ? String(format: "%.1fm", averageDistance)
+                : String(format: "%.1fft", averageDistance * 3.281))
             Divider().frame(height: 30)
             StatView(title: "Avg Confidence", value: "\(averageConfidence)%")
         }
@@ -284,7 +287,9 @@ struct HistoryView: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                Text(String(format: "%.1fm", scan.distance))
+                Text(appState.settings.useMetricUnits
+                    ? String(format: "%.1fm", scan.distance)
+                    : String(format: "%.1fft", scan.distance * 3.281))
                     .font(.headline)
                     .foregroundColor(.green)
 

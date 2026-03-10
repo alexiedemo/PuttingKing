@@ -149,6 +149,6 @@ struct ARViewContainer_Previews: PreviewProvider {
             viewModel: ScanningViewModel(settings: AppSettings()),
             arSessionManager: ARSessionManager()
         )
-        .edgesIgnoringSafeArea(.all)
+        .ignoresSafeArea()
     }
 }

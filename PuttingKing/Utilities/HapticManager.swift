@@ -8,8 +8,9 @@ private let logger = Logger(subsystem: "com.puttingking", category: "Haptics")
 /// Based on Apple's Human Interface Guidelines for haptic feedback
 /// M16 fix: Thread-safe engine restart via DispatchQueue serialization
 /// M17 fix: Pre-prepared generators for lower latency haptic response
+@MainActor
 final class HapticManager {
-    static let shared = HapticManager()
+    nonisolated(unsafe) static let shared = HapticManager()
 
     private var hapticEngine: CHHapticEngine?
     private var isEnabled: Bool = true
@@ -256,8 +257,8 @@ final class HapticManager {
                 try player?.start(atTime: CHHapticTimeImmediate)
             } catch {
                 logger.error("Failed to play custom haptic: \(error.localizedDescription)")
-                DispatchQueue.main.async { [weak self] in
-                    self?.success() // Fallback
+                Task { @MainActor in
+                    self?.success()
                 }
             }
         }
@@ -296,7 +297,7 @@ final class HapticManager {
                 try player?.start(atTime: CHHapticTimeImmediate)
             } catch {
                 logger.error("Failed to play heartbeat: \(error.localizedDescription)")
-                DispatchQueue.main.async { [weak self] in
+                Task { @MainActor in
                     self?.softImpact()
                 }
             }

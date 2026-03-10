@@ -195,20 +195,15 @@ final class LiDARScanningService: NSObject, ObservableObject {
 
     func handleAnchorsAdded(_ anchors: [ARAnchor]) {
         meshAnchorsLock.lock()
-        guard _internalIsScanning else {
-            meshAnchorsLock.unlock()
-            return
-        }
+        defer { meshAnchorsLock.unlock() }
+
+        guard _internalIsScanning else { return }
 
         let meshAnchors = anchors.compactMap { $0 as? ARMeshAnchor }
-        guard !meshAnchors.isEmpty else {
-            meshAnchorsLock.unlock()
-            return
-        }
+        guard !meshAnchors.isEmpty else { return }
 
         _internalMeshAnchors.append(contentsOf: meshAnchors)
         let updatedAnchors = _internalMeshAnchors
-        meshAnchorsLock.unlock()
 
         updateMetricsOnMainThread(with: updatedAnchors)
 
@@ -217,42 +212,34 @@ final class LiDARScanningService: NSObject, ObservableObject {
 
     func handleAnchorsUpdated(_ anchors: [ARAnchor]) {
         meshAnchorsLock.lock()
-        guard _internalIsScanning else {
-            meshAnchorsLock.unlock()
-            return
-        }
+        defer { meshAnchorsLock.unlock() }
+
+        guard _internalIsScanning else { return }
 
         let meshAnchors = anchors.compactMap { $0 as? ARMeshAnchor }
-        guard !meshAnchors.isEmpty else {
-            meshAnchorsLock.unlock()
-            return
-        }
+        guard !meshAnchors.isEmpty else { return }
 
         for updatedAnchor in meshAnchors {
             if let index = _internalMeshAnchors.firstIndex(where: { $0.identifier == updatedAnchor.identifier }) {
                 _internalMeshAnchors[index] = updatedAnchor
             } else {
-                // Anchor not in internal storage (cleared by reset) — recapture it.
-                // ARKit only fires didAdd once per anchor lifetime; subsequent
-                // deliveries come through didUpdate, so we must re-add here.
                 _internalMeshAnchors.append(updatedAnchor)
             }
         }
 
         let updatedAnchors = _internalMeshAnchors
-        meshAnchorsLock.unlock()
 
         updateMetricsOnMainThread(with: updatedAnchors)
     }
 
     func handleAnchorsRemoved(_ anchors: [ARAnchor]) {
         meshAnchorsLock.lock()
+        defer { meshAnchorsLock.unlock() }
 
         let removedIds = Set(anchors.compactMap { ($0 as? ARMeshAnchor)?.identifier })
         _internalMeshAnchors.removeAll { removedIds.contains($0.identifier) }
 
         let updatedAnchors = _internalMeshAnchors
-        meshAnchorsLock.unlock()
 
         updateMetricsOnMainThread(with: updatedAnchors)
     }

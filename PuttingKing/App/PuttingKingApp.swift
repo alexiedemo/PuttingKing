@@ -10,7 +10,7 @@ struct PuttingKingApp: App {
             ContentView()
                 .environmentObject(appState)
         }
-        .onChange(of: scenePhase) { newPhase in
+        .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .background:
                 // Flush any pending settings to disk before backgrounding

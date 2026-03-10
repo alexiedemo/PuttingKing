@@ -60,8 +60,12 @@ struct HomeView: View {
             }
         }
         // Keep local slider in sync if settings change from another screen
-        .onChange(of: appState.settings.stimpmeterSpeed) { newValue in
+        .onChange(of: appState.settings.stimpmeterSpeed) { _, newValue in
             stimpmeterSpeed = newValue
+        }
+        .onDisappear {
+            saveTimer?.invalidate()
+            saveTimer = nil
         }
     }
 
@@ -177,7 +181,7 @@ struct HomeView: View {
                     .accentColor(DesignSystem.Colors.primary)
                     .accessibilityLabel("Green speed, Stimpmeter")
                     .accessibilityValue("\(String(format: "%.1f", stimpmeterSpeed)) feet")
-                    .onChange(of: stimpmeterSpeed) { newValue in
+                    .onChange(of: stimpmeterSpeed) { _, newValue in
                         // L12 fix: use centralized HapticManager (pre-prepared generator)
                         // and respect the haptic enabled setting
                         if appState.settings.hapticFeedbackEnabled {
@@ -257,7 +261,9 @@ struct HomeView: View {
             guard !isStarting else { return }
             isStarting = true
 
-            HapticManager.shared.mediumImpact()
+            if appState.settings.hapticFeedbackEnabled {
+                HapticManager.shared.mediumImpact()
+            }
 
             // Brief loading state for smoother transition
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {

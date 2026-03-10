@@ -88,7 +88,7 @@ final class ScanHistoryService: ObservableObject {
         let scan = ScanRecord(context: context)
         scan.id = UUID()
         scan.courseName = courseName
-        scan.holeNumber = Int16(holeNumber)
+        scan.holeNumber = Int16(clamping: holeNumber)
         scan.date = Date()
         scan.distance = distance
         scan.totalBreak = totalBreak
@@ -147,18 +147,22 @@ final class ScanHistoryService: ObservableObject {
         let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
         deleteRequest.resultType = .resultTypeObjectIDs
 
-        do {
-            let result = try persistenceController.viewContext.execute(deleteRequest) as? NSBatchDeleteResult
-            // Merge batch delete into the context so in-memory objects are invalidated
-            if let objectIDs = result?.result as? [NSManagedObjectID] {
-                NSManagedObjectContext.mergeChanges(
-                    fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
-                    into: [persistenceController.viewContext]
-                )
+        let bgContext = persistenceController.newBackgroundContext()
+        bgContext.perform { [weak self] in
+            do {
+                let result = try bgContext.execute(deleteRequest) as? NSBatchDeleteResult
+                if let objectIDs = result?.result as? [NSManagedObjectID] {
+                    NSManagedObjectContext.mergeChanges(
+                        fromRemoteContextSave: [NSDeletedObjectsKey: objectIDs],
+                        into: [bgContext]
+                    )
+                }
+                Task { @MainActor [weak self] in
+                    self?.fetchRecentScans()
+                }
+            } catch {
+                logger.error("Failed to delete all scans: \(error.localizedDescription)")
             }
-            fetchRecentScans()
-        } catch {
-            logger.error("Failed to delete all scans: \(error.localizedDescription)")
         }
     }
 

@@ -147,32 +147,10 @@ final class ARSessionManager: NSObject, ObservableObject {
     }
 
     /// Get estimated ground position (fallback)
+    /// Returns nil — guessing a position at a hardcoded distance produces inaccurate
+    /// markers that corrupt the physics analysis. Callers handle nil by showing an error toast.
     private func getEstimatedGroundPosition(from screenPoint: CGPoint) -> SIMD3<Float>? {
-        guard let arView = arView,
-              let frame = arView.session.currentFrame else { return nil }
-
-        let camera = frame.camera
-        let cameraTransform = camera.transform
-
-        // Project ray from camera through screen point
-        let normalizedPoint = CGPoint(
-            x: screenPoint.x / arView.bounds.width,
-            y: screenPoint.y / arView.bounds.height
-        )
-
-        // Estimate ground at 2m distance
-        let distance: Float = 2.0
-        let direction = SIMD3<Float>(
-            Float(normalizedPoint.x - 0.5) * 2,
-            -0.5, // Slightly downward
-            -1.0
-        )
-        let normalizedDirection = simd_normalize(direction)
-
-        let worldDirection = cameraTransform.transformDirection(normalizedDirection)
-        let cameraPosition = cameraTransform.translation
-
-        return cameraPosition + worldDirection * distance
+        return nil
     }
 
     // MARK: - Marker Management
@@ -388,11 +366,6 @@ final class ARSessionManager: NSObject, ObservableObject {
         }
 
         return entity
-    }
-
-    /// Create putting line entity from path points - renders smooth curved path on ground
-    private func createPuttingLineEntity(from line: PuttingLine, color: AppSettings.LineColor) -> Entity {
-        return createEnhancedPuttingLineEntity(from: line, color: color)
     }
 
     /// Create enhanced putting line with velocity-based coloring and better visibility.
@@ -890,18 +863,18 @@ final class ARSessionManager: NSObject, ObservableObject {
 // MARK: - ARSessionDelegate
 extension ARSessionManager: ARSessionDelegate {
     nonisolated func session(_ session: ARSession, didAdd anchors: [ARAnchor]) {
-        // Forward to LiDAR service (thread-safe internally)
-        lidarService.handleAnchorsAdded(anchors)
+        let service = LiDARScanningService.shared
+        service.handleAnchorsAdded(anchors)
     }
 
     nonisolated func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
-        // Forward to LiDAR service (thread-safe internally)
-        lidarService.handleAnchorsUpdated(anchors)
+        let service = LiDARScanningService.shared
+        service.handleAnchorsUpdated(anchors)
     }
 
     nonisolated func session(_ session: ARSession, didRemove anchors: [ARAnchor]) {
-        // Forward to LiDAR service (thread-safe internally)
-        lidarService.handleAnchorsRemoved(anchors)
+        let service = LiDARScanningService.shared
+        service.handleAnchorsRemoved(anchors)
     }
 
     nonisolated func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {

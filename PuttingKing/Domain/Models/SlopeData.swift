@@ -42,7 +42,7 @@ struct SlopeData {
         }
 
         init(samples: [GradientSample], cellSize: Float = 0.25) {
-            self.cellSize = cellSize
+            self.cellSize = max(cellSize, 0.01)
 
             guard !samples.isEmpty else {
                 self.cells = [:]
@@ -193,10 +193,10 @@ struct SlopeData {
         /// Returns nil if the query point is outside grid bounds or near an invalid cell.
         @inline(__always)
         func lookup(x: Float, z: Float) -> (gradientX: Float, gradientZ: Float, slopeAngle: Float)? {
+            guard x.isFinite && z.isFinite else { return nil }
             let gx = (x - originX) * invCellSize
             let gz = (z - originZ) * invCellSize
 
-            // Fast bounds check
             guard gx >= 0 && gz >= 0 else { return nil }
             let ix = Int(gx)
             let iz = Int(gz)

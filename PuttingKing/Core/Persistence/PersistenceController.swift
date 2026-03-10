@@ -22,12 +22,18 @@ final class PersistenceController {
             container.persistentStoreDescriptions.first?.url = URL(fileURLWithPath: "/dev/null")
         }
 
-        container.loadPersistentStores { description, error in
+        container.loadPersistentStores { [weak container] description, error in
             if let error = error {
-                // Core Data must load successfully — the app cannot function without
-                // persistence for scan history. A silent failure here causes crashes
-                // later when saving/fetching records with no store loaded.
-                fatalError("Core Data failed to load: \(error.localizedDescription)")
+                logger.error("Core Data failed to load: \(error.localizedDescription). Falling back to in-memory store.")
+                guard let container = container else { return }
+                let inMemoryDesc = NSPersistentStoreDescription()
+                inMemoryDesc.type = NSInMemoryStoreType
+                container.persistentStoreDescriptions = [inMemoryDesc]
+                container.loadPersistentStores { _, fallbackError in
+                    if let fallbackError = fallbackError {
+                        logger.error("In-memory fallback also failed: \(fallbackError.localizedDescription)")
+                    }
+                }
             }
         }
 
@@ -125,6 +131,7 @@ final class PersistenceController {
         return model
     }
 
+    @MainActor
     func save() {
         let context = container.viewContext
 
@@ -137,7 +144,7 @@ final class PersistenceController {
         }
     }
 
-    /// Throwing variant for callers that need to handle save failures
+    @MainActor
     func saveOrThrow() throws {
         let context = container.viewContext
         guard context.hasChanges else { return }
@@ -163,8 +170,8 @@ final class PersistenceController {
             scan.date = Date().addingTimeInterval(-Double(i * 86400))
             scan.distance = Float.random(in: 2.0...10.0)
             scan.totalBreak = Float.random(in: 0.02...0.15)
-            scan.breakDirection = ["left", "right", "straight"].randomElement()!
-            scan.recommendedSpeed = ["gentle", "moderate", "firm"].randomElement()!
+            scan.breakDirection = ["left", "right", "straight"].randomElement() ?? "straight"
+            scan.recommendedSpeed = ["gentle", "moderate", "firm"].randomElement() ?? "moderate"
             scan.confidence = Float.random(in: 0.6...0.95)
             scan.stimpmeterSpeed = Float.random(in: 8.0...12.0)
         }

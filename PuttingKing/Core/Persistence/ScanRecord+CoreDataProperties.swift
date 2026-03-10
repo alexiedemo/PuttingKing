@@ -28,7 +28,7 @@ extension ScanRecord {
     // Computed properties for convenience
     var breakDescription: String {
         guard totalBreak > 0.01 else { return "Straight" }
-        let breakCm = Int(totalBreak * 100)
+        let breakCm = Int(round(abs(totalBreak) * 100))
         switch breakDirection {
         case "left":
             return "\(breakCm)cm left"

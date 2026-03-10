@@ -51,10 +51,9 @@ struct ScanningContainerView: View {
                 }
                 .onDisappear {
                     isViewVisible = false
-                    // Clean up async task to prevent memory leaks
+                    viewModel.cancel()
                     analysisTimerTask?.cancel()
                     analysisTimerTask = nil
-                    // Cancel pending toast dismissal timers
                     validationDismissWorkItem?.cancel()
                     positionErrorDismissWorkItem?.cancel()
                 }
@@ -113,17 +112,15 @@ struct ScanningContainerView: View {
             }
         }
         .statusBar(hidden: true)
-        .onChange(of: viewModel.scanState) { newState in
+        .onChange(of: viewModel.scanState) { _, newState in
             handleStateChange(newState)
         }
-        .onChange(of: viewModel.error?.message) { errorMessage in
-            // Show validation errors as a toast when NOT in the .error scan state
-            // (e.g., distance validation failures during .markingBall)
+        .onChange(of: viewModel.error?.message) { _, errorMessage in
             guard let message = errorMessage else { return }
             if case .error = viewModel.scanState { return }
             showValidationError(message)
         }
-        .onChange(of: scenePhase) { newPhase in
+        .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .active:
                 // Resume session if we were previously running
@@ -874,12 +871,17 @@ struct ScanningContainerView: View {
             HapticManager.shared.holeMarked()
         }
 
-        if let position = arSessionManager.getWorldPosition(
-            from: CGPoint(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.midY)
-        ) {
+        let screenCenter: CGPoint
+        if let arView = arSessionManager.arView {
+            screenCenter = CGPoint(x: arView.bounds.midX, y: arView.bounds.midY)
+        } else {
+            showPositionErrorFeedback()
+            return
+        }
+
+        if let position = arSessionManager.getWorldPosition(from: screenCenter) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 viewModel.markHole(at: position)
-                // Marker placement handled by ARViewContainer on state change
             }
         } else {
             showPositionErrorFeedback()
@@ -891,9 +893,15 @@ struct ScanningContainerView: View {
             HapticManager.shared.ballMarked()
         }
 
-        if let position = arSessionManager.getWorldPosition(
-            from: CGPoint(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.midY)
-        ) {
+        let screenCenter: CGPoint
+        if let arView = arSessionManager.arView {
+            screenCenter = CGPoint(x: arView.bounds.midX, y: arView.bounds.midY)
+        } else {
+            showPositionErrorFeedback()
+            return
+        }
+
+        if let position = arSessionManager.getWorldPosition(from: screenCenter) {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 viewModel.markBall(at: position)
                 // Marker placement handled by ARViewContainer on state change

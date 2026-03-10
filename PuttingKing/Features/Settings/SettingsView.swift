@@ -55,7 +55,7 @@ struct SettingsView: View {
         // This prevents double UserDefaults writes (old .onChange + AppState.didSet both triggered save()).
         .alert("Reset Settings", isPresented: $showingResetConfirmation) {
             Button("Reset", role: .destructive) {
-                settings.reset()
+                settings = AppSettings()
                 appState.settings = settings
             }
             Button("Cancel", role: .cancel) { }
@@ -79,7 +79,7 @@ struct SettingsView: View {
 
                 Slider(value: $settings.stimpmeterSpeed, in: 6...14, step: 0.5)
                     .accentColor(.green)
-                    .onChange(of: settings.stimpmeterSpeed) { _ in
+                    .onChange(of: settings.stimpmeterSpeed) { _, _ in
                         if settings.hapticFeedbackEnabled {
                             HapticManager.shared.selectionChanged()
                         }
@@ -368,7 +368,7 @@ struct SettingsView: View {
                 TextField("Course Name", text: $settings.defaultCourseName)
                     .multilineTextAlignment(.trailing)
                     .foregroundColor(.secondary)
-                    .onChange(of: settings.defaultCourseName) { newValue in
+                    .onChange(of: settings.defaultCourseName) { _, newValue in
                         if newValue.count > 100 {
                             settings.defaultCourseName = String(newValue.prefix(100))
                         }

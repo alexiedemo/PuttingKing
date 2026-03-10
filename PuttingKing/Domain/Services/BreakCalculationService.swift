@@ -527,13 +527,13 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         let speeds: [Float] = [baseSpeed * 0.9, baseSpeed * 0.95, baseSpeed, baseSpeed * 1.05, baseSpeed * 1.1]
         let angles: [Float] = [-.pi/36, -.pi/72, 0, .pi/72, .pi/36] // +/- 5 degrees
 
-        for speed in speeds {
+        outerFallback: for speed in speeds {
             for angle in angles {
-                if Task.isCancelled { break }
+                if Task.isCancelled { break outerFallback }
                 if CFAbsoluteTimeGetCurrent() - fallbackStart > fallbackTimeout {
                     let fallbackTimeStr = String(format: "%.2f", CFAbsoluteTimeGetCurrent() - fallbackStart)
                     logger.warning("Fallback timeout after \(fallbackTimeStr)s")
-                    break
+                    break outerFallback
                 }
 
                 let rotatedDirection = rotateDirectionHorizontal(directDirection, by: angle)
@@ -554,8 +554,6 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
                     best = (result, speed, angle, closestDistance)
                 }
             }
-            if Task.isCancelled { break }
-            if CFAbsoluteTimeGetCurrent() - fallbackStart > fallbackTimeout { break }
         }
 
         guard let result = best else { return nil }
@@ -586,11 +584,11 @@ final class BreakCalculationService: BreakCalculationServiceProtocol {
         let fineAngleSteps: [Float] = [-.pi/180, -.pi/360, 0, .pi/360, .pi/180] // +/- 1 degree, 0.5 degree
         let fineSpeedSteps: [Float] = [-0.03, -0.015, 0, 0.015, 0.03]
 
-        for angleOffset in fineAngleSteps {
-            if Task.isCancelled { break }
-            // Timeout guard: bail out if approaching the search deadline
-            if CFAbsoluteTimeGetCurrent() > deadline { break }
+        outerRefine: for angleOffset in fineAngleSteps {
+            if Task.isCancelled { break outerRefine }
+            if CFAbsoluteTimeGetCurrent() > deadline { break outerRefine }
             for speedOffset in fineSpeedSteps {
+                if Task.isCancelled { break outerRefine }
                 let angle = initial.angle + angleOffset
                 let speed = initial.speed * (1 + speedOffset)
 

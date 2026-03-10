@@ -72,7 +72,7 @@ struct AppSettings: Codable, Equatable {
     private var _stimpmeterSpeed: Float = 10.0
     var stimpmeterSpeed: Float {
         get { _stimpmeterSpeed }
-        set { _stimpmeterSpeed = max(6.0, min(14.0, newValue)) }
+        set { guard newValue.isFinite else { return }; _stimpmeterSpeed = max(6.0, min(14.0, newValue)) }
     }
 
     var useMetricUnits: Bool = true
@@ -85,7 +85,7 @@ struct AppSettings: Codable, Equatable {
     private var _defaultHoleNumber: Int = 1
     var defaultHoleNumber: Int {
         get { _defaultHoleNumber }
-        set { _defaultHoleNumber = max(1, min(18, newValue)) }
+        set { _defaultHoleNumber = max(1, min(18, abs(newValue))) }
     }
 
     // Enhanced physics settings
@@ -98,6 +98,7 @@ struct AppSettings: Codable, Equatable {
     var grainDirectionDegrees: Float {
         get { _grainDirectionDegrees }
         set {
+            guard newValue.isFinite else { return }
             var v = newValue.truncatingRemainder(dividingBy: 360.0)
             if v < 0 { v += 360.0 }
             _grainDirectionDegrees = v
@@ -113,13 +114,13 @@ struct AppSettings: Codable, Equatable {
     private var _temperatureCelsius: Float = 20.0
     var temperatureCelsius: Float {
         get { _temperatureCelsius }
-        set { _temperatureCelsius = max(-10.0, min(50.0, newValue)) }
+        set { guard newValue.isFinite else { return }; _temperatureCelsius = max(-10.0, min(50.0, newValue)) }
     }
 
     private var _altitudeMeters: Float = 0.0
     var altitudeMeters: Float {
         get { _altitudeMeters }
-        set { _altitudeMeters = max(0.0, min(5000.0, newValue)) }
+        set { guard newValue.isFinite else { return }; _altitudeMeters = max(0.0, min(5000.0, newValue)) }
     }
 
     // Accessibility settings
@@ -186,6 +187,27 @@ struct AppSettings: Codable, Equatable {
     }
 
     private static let storageKey = "appSettings"
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = AppSettings()
+        _stimpmeterSpeed = (try? c.decode(Float.self, forKey: ._stimpmeterSpeed)) ?? defaults._stimpmeterSpeed
+        useMetricUnits = (try? c.decode(Bool.self, forKey: .useMetricUnits)) ?? defaults.useMetricUnits
+        showSlopeHeatmap = (try? c.decode(Bool.self, forKey: .showSlopeHeatmap)) ?? defaults.showSlopeHeatmap
+        hapticFeedbackEnabled = (try? c.decode(Bool.self, forKey: .hapticFeedbackEnabled)) ?? defaults.hapticFeedbackEnabled
+        lineColor = (try? c.decode(LineColor.self, forKey: .lineColor)) ?? defaults.lineColor
+        autoSaveScans = (try? c.decode(Bool.self, forKey: .autoSaveScans)) ?? defaults.autoSaveScans
+        defaultCourseName = (try? c.decode(String.self, forKey: .defaultCourseName)) ?? defaults.defaultCourseName
+        _defaultHoleNumber = (try? c.decode(Int.self, forKey: ._defaultHoleNumber)) ?? defaults._defaultHoleNumber
+        grassType = (try? c.decode(GrassType.self, forKey: .grassType)) ?? defaults.grassType
+        greenCondition = (try? c.decode(GreenCondition.self, forKey: .greenCondition)) ?? defaults.greenCondition
+        _grainDirectionDegrees = (try? c.decode(Float.self, forKey: ._grainDirectionDegrees)) ?? defaults._grainDirectionDegrees
+        _temperatureCelsius = (try? c.decode(Float.self, forKey: ._temperatureCelsius)) ?? defaults._temperatureCelsius
+        _altitudeMeters = (try? c.decode(Float.self, forKey: ._altitudeMeters)) ?? defaults._altitudeMeters
+        highContrastMode = (try? c.decode(Bool.self, forKey: .highContrastMode)) ?? defaults.highContrastMode
+        showConfidenceBand = (try? c.decode(Bool.self, forKey: .showConfidenceBand)) ?? defaults.showConfidenceBand
+        colorblindMode = (try? c.decode(ColorblindMode.self, forKey: .colorblindMode)) ?? defaults.colorblindMode
+    }
 
     static func load() -> AppSettings {
         guard let data = UserDefaults.standard.data(forKey: storageKey),

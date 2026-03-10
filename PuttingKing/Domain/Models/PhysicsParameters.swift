@@ -89,10 +89,11 @@ struct PhysicsParameters {
     // Grain grows toward the setting sun or water drainage
     var grainDirection: Float = 0.0
 
-    // Pre-computed grain direction unit vector — avoids sin/cos on every simulation step.
-    // frictionWithGrain() and grainDeflectionAcceleration() are called ~1280× per sim;
-    // caching the trig result saves ~2400 sin/cos evaluations per simulation.
-    let grainDirectionVector: SIMD2<Float>
+    // Grain direction unit vector derived from grainDirection.
+    // Computed so it stays consistent if grainDirection is mutated post-init.
+    var grainDirectionVector: SIMD2<Float> {
+        SIMD2<Float>(sin(grainDirection), cos(grainDirection))
+    }
 
     // Environmental
     var gravity: Float = 9.81
@@ -113,13 +114,10 @@ struct PhysicsParameters {
          grainDirection: Float = 0.0, temperatureCelsius: Float = 20.0) {
         self.stimpmeterSpeed = stimpmeterSpeed
         self.grassType = grassType
-        self.moistureLevel = moistureLevel
+        self.moistureLevel = min(max(moistureLevel, 0), 1.0)
         self.temperatureCelsius = temperatureCelsius
 
-        // Validate grain direction — NaN would propagate to all grain calculations
-        let safeGrainDirection = grainDirection.isFinite ? grainDirection : 0.0
-        self.grainDirection = safeGrainDirection
-        self.grainDirectionVector = SIMD2<Float>(sin(safeGrainDirection), cos(safeGrainDirection))
+        self.grainDirection = grainDirection.isFinite ? grainDirection : 0.0
 
         self.ballMomentOfInertia = (2.0 / 5.0) * ballMass * pow(Self.ballRadius, 2)
 
@@ -152,8 +150,7 @@ struct PhysicsParameters {
         // Stimpmeter releases ball at 1.83 m/s (from 20° ramp, 30" release point)
         let v0: Float = 1.83
 
-        // Safety clamp: stimpmeter must be positive to avoid divide-by-zero
-        let clampedStimpmeter = max(stimpmeter, 1.0)
+        let clampedStimpmeter = stimpmeter.isFinite ? max(stimpmeter, 1.0) : 10.0
 
         // Convert stimpmeter feet to meters
         let stimpmeterMeters = clampedStimpmeter * 0.3048
@@ -202,15 +199,13 @@ struct PhysicsParameters {
     /// Calculate initial ball speed needed to roll a given distance on flat green
     /// Accounts for both skid and roll phases to match the simulation model exactly.
     func initialSpeedForDistance(_ distance: Float) -> Float {
-        // The ball undergoes two phases on flat ground:
-        //   Skid (20% of distance):  a_skid = skidFrictionMultiplier * μ * g
-        //   Roll (80% of distance):  a_roll = (5/7) * μ * g
-        // Energy balance: v₀² = 2 * (a_skid * d_skid + a_roll * d_roll)
+        guard distance > 0 else { return 0 }
         let skidDecel = frictionCoefficient * skidFrictionMultiplier * gravity
         let rollDecel = Self.rollingDecelerationFactor * frictionCoefficient * gravity
         let d_skid = distance * skidDistanceRatio
         let d_roll = distance * (1.0 - skidDistanceRatio)
-        return sqrt(2.0 * (skidDecel * d_skid + rollDecel * d_roll))
+        let arg = 2.0 * (skidDecel * d_skid + rollDecel * d_roll)
+        return arg > 0 ? sqrt(arg) : 0
     }
 
     /// Calculate initial speed to reach hole with optimal capture speed

@@ -72,7 +72,7 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
             return SlopeData(
                 gradientField: [],
                 maxSlope: 0,
-                averageSlope: 1.0, // Assume 1% average slope for flat surface
+                averageSlope: 0,
                 dominantDirection: .zero
             )
         }
@@ -104,7 +104,7 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
             for i in 0..<gradientSamples.count {
                 gradientSamples[i].gradient *= scaleFactor
                 gradientSamples[i].slopePercentage *= scaleFactor
-                gradientSamples[i].slopeAngle *= scaleFactor
+                gradientSamples[i].slopeAngle = atan(simd_length(gradientSamples[i].gradient))
             }
             maxSlope *= scaleFactor
             avgSlope *= scaleFactor
@@ -146,6 +146,7 @@ final class SlopeAnalysisService: SlopeAnalysisServiceProtocol {
         steps: Int,
         in slopeData: SlopeData
     ) -> [SlopeData.GradientSample] {
+        guard steps > 0 else { return [] }
         var samples: [SlopeData.GradientSample] = []
 
         for i in 0...steps {

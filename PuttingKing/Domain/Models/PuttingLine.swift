@@ -27,10 +27,9 @@ struct PuttingLine {
         let breakProfile: [Float]
 
         var breakDescription: String {
-            // Less than 2cm is effectively straight
             guard totalBreak > 0.02 else { return "Straight" }
 
-            let breakCm = Int(totalBreak * 100)
+            let breakCm = Int(round(totalBreak * 100))
 
             // Use more readable format for larger breaks
             if breakCm >= 100 {
@@ -59,7 +58,7 @@ struct PuttingLine {
         var shortDescription: String {
             guard totalBreak > 0.02 else { return "Straight" }
 
-            let breakCm = Int(totalBreak * 100)
+            let breakCm = Int(round(totalBreak * 100))
             switch breakDirection {
             case .left:
                 return "\(breakCm)cm L"

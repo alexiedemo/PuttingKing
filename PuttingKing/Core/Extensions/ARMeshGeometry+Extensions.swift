@@ -146,6 +146,10 @@ extension ARMeshAnchor {
     /// Get all normals in world coordinates
     func worldNormals() -> [SIMD3<Float>] {
         let localNormals = geometry.extractNormals()
-        return localNormals.map { simd_normalize(transform.transformDirection($0)) }
+        return localNormals.map { normal in
+            let transformed = transform.transformDirection(normal)
+            let len = simd_length(transformed)
+            return len > .ulpOfOne ? transformed / len : SIMD3<Float>(0, 1, 0)
+        }
     }
 }

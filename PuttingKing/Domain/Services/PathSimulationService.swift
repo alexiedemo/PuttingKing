@@ -203,6 +203,7 @@ final class PathSimulationService: PathSimulationServiceProtocol {
     // Cache the triangle spatial hash across repeated simulations on the same surface.
     // BreakCalculationService calls simulatePutt 40-150 times per analysis with the
     // same surface — rebuilding the cache each time was ~91ms/call (the dominant cost).
+    private let cacheLock = NSLock()
     private var cachedSurfaceId: UUID?
     private var cachedHeightCache: TriangleSurfaceCache?
 
@@ -212,6 +213,8 @@ final class PathSimulationService: PathSimulationServiceProtocol {
 
     /// Release cached height data to free memory after analysis completes
     func clearHeightCache() {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
         cachedSurfaceId = nil
         cachedHeightCache = nil
     }
@@ -259,12 +262,18 @@ final class PathSimulationService: PathSimulationServiceProtocol {
 
         // Reuse or build triangle spatial cache — avoids O(N) rebuild on every simulation
         let heightCache: TriangleSurfaceCache
+        cacheLock.lock()
         if surface.id == cachedSurfaceId, let cached = cachedHeightCache {
             heightCache = cached
+            cacheLock.unlock()
         } else {
-            heightCache = TriangleSurfaceCache(vertices: surface.vertices, triangles: surface.triangles)
+            cacheLock.unlock()
+            let newCache = TriangleSurfaceCache(vertices: surface.vertices, triangles: surface.triangles)
+            cacheLock.lock()
             cachedSurfaceId = surface.id
-            cachedHeightCache = heightCache
+            cachedHeightCache = newCache
+            cacheLock.unlock()
+            heightCache = newCache
         }
 
         // Record starting point
